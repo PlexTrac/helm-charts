@@ -1,0 +1,4 @@
+Support common secret management tools eg via annotations
+Investigate Helm hooks for applying migrations
+Create common library chart for managing things like PVCs, Ingress, etc
+Integrate into central docs repo
