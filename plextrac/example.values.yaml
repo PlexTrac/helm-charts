@@ -1,0 +1,50 @@
+global:
+  imageRegistry: k3d-registry.localhost:5000
+
+image:
+  repository: plextrac/plextracapi
+  pullPolicy: Always
+  tag: ""
+
+imagePullSecrets:
+  - name: docker-registry-token-plextracusers-ro
+
+volumes:
+  - name: uploads
+    mountPath: /usr/src/plextrac-api/uploads
+    storageClassName: local-path
+    size: 1Gi
+
+service:
+  type: ClusterIP
+  port: 4350
+
+ingress:
+  enabled: false
+  className: {}
+  annotations: {}
+  hosts:
+    - host: plextrac-helm.localhost
+      paths:
+        - path: /api
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    memory: 100Mi
+    cpu: 100m
+  limits: {}
+
+redis:
+  enabled: true
+  redisPass: "fakepass"
+
+couchbase:
+  enabled: true
+  couchbaseUser: cbhelmuser
+  couchbasePass: cbhelmpass
+
+cockroachdb:
+  enabled: false
+

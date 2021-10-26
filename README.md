@@ -92,4 +92,88 @@ Intended to replace couchbase, deploys `cockroachdb`. Currently used for audit l
 
 Used for cache & inter-pod communication for multi-pod configurations
 
-## 
+
+# Values
+
+### Structure
+
+#### globals
+
+Place values here that are _shared_ between a chart and it's sub-charts. For example, a password
+that should be shared between an application and it's dependency (eg, redis) should be placed in
+globals following an appropriate namespacing scheme. This global config is separate from sub-chart
+specific configuration.
+
+**Example:**
+
+```yaml
+# -- Global customizations (for charts that support it)
+globals:
+  # -- Customize the registry used for pulling images
+  imageRegistry: k3d-registry.localhost:5000
+  redis:
+    # -- Specify the redis password 
+    password: ********************************
+
+image:
+  # -- Docker image repository
+  repository: plextrac/foo
+  # -- Docker image tag
+  tag: "stable"
+
+# -- configuration for the redis sub-chart
+redis:
+  # -- Enables installation of the redis sub-chart
+  enabled: true
+```
+
+In the above example, `.Values.globals.redis.password` will be used by the redis sub-chart & by
+the parent chart for redis authentication. The `image` parameter in the main deployment will be set
+as `k3d-registry.localhost:5000/plextrac/foo:stable`.
+
+
+#### sub-charts
+
+Configuration specific to sub-charts must go under a top level key of the sub-charts name. If the
+chart is optional, the dependency should be included dependent on a `subchart.enabled == true`
+flag.
+
+> it should be fine to override the name of a dependency (eg, to deploy redis as `localcache`)
+> this should be supported
+
+**Example**
+```yaml
+...
+redis:
+  enabled: true
+  nameOverride: localcache  # would be available at `redis://localcache:6379`
+```
+
+
+
+### External Dependencies
+
+More complex or higher load environments may merit using a separately managed dependency (eg,
+swapping out Redis for Elasticache). This should be configured in the top-level `Values`, not
+under the corresponding internal dependency (ie, sub-chart) configuration.
+
+**Wrong:**
+
+```yaml
+...
+redis:
+  enabled: false
+  host: redis-01.7abc2d.0001.usw2.cache.amazonaws.com
+  port: 6379
+```
+
+**Correct:**
+
+```yaml
+---
+...
+redis:
+  enabled: false
+
+externalRedisHost: redis-01.7abc2d.0001.usw2.cache.amazonaws.com
+externalRedisPort: 6379

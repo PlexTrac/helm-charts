@@ -1,2 +1,5 @@
 .env
 kubeconfig.yaml
+*.swp
+*.bak
+*.lock

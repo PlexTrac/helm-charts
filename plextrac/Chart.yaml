@@ -1,0 +1,16 @@
+apiVersion: v2
+name: plextrac
+description: Deploys the PlexTrac application & any required dependencies
+
+type: application
+
+# Represents the chart revision
+version: 0.1.0
+
+# Uses the "stable" tag for PlexTrac images
+appVersion: "stable"
+
+dependencies:
+- name: common
+  version: "~0.1"
+  repository: "file://../common"

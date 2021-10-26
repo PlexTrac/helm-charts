@@ -1,0 +1,74 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+
+image:
+  repository: plextrac/plextracapi
+  pullPolicy: Always
+  tag: ""
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 4350
+
+ingress:
+  enabled: false
+  className: {}
+  annotations: {}
+  hosts:
+    - host: plextrac.local
+      paths:
+        - path: /api
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests: {}
+  limits: {}
+
+core-frontend: # This loads the PlexTrac UI locally vs from a CDN
+  # This is technically not a sub-chart. The frontend is useless without the
+  # backend (plextracapi) so this is just to keep things organized neatly.
+  # As a bonus, we can eventually split this to a CDN (possibly Minio for local?)
+  enabled: true
+  image:
+    repository: plextrac/plextracnginx
+    pullPolicy: Always
+    tag: ""
+
+  ingress:
+    enabled: false
+    className: {}
+    annotations: {}
+    hosts:
+      - host: plextrac.local
+        paths:
+          - path: /api
+            pathType: Prefix
+    tls: []
+
+redis:
+  # -- Enables the sub-chart
+  enabled: true
+  # -- Configure connection string
+  connectionString: ""
+  # -- Specify password for redis connection
+  redisPass: ""
+  # -- Specify existing secret containing redis password
+  existingSecret: ""
+  # -- Specify lookup key for existing secret
+  existingSecretPasswordKey: "redis-password"
+
+couchbase:
+  enabled: true
+
+  couchbaseUser: cbhelmuser
+  couchbasePass: cbhelmpass
+
+cockroachdb:
+  enabled: false
+
