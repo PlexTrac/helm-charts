@@ -95,9 +95,9 @@ Used for cache & inter-pod communication for multi-pod configurations
 
 # Values
 
-### Structure
+## Structure
 
-#### globals
+### globals
 
 Place values here that are _shared_ between a chart and it's sub-charts. For example, a password
 that should be shared between an application and it's dependency (eg, redis) should be placed in
@@ -132,7 +132,7 @@ the parent chart for redis authentication. The `image` parameter in the main dep
 as `k3d-registry.localhost:5000/plextrac/foo:stable`.
 
 
-#### sub-charts
+### sub-charts
 
 Configuration specific to sub-charts must go under a top level key of the sub-charts name. If the
 chart is optional, the dependency should be included dependent on a `subchart.enabled == true`
@@ -177,3 +177,7 @@ redis:
 
 externalRedisHost: redis-01.7abc2d.0001.usw2.cache.amazonaws.com
 externalRedisPort: 6379
+```
+
+By making these explicit via the `external` prefix, we avoid confusion and ensure configuration
+parameters are obvious. _Simple is better than complex_.
