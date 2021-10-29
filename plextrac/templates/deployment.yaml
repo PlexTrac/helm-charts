@@ -32,16 +32,24 @@ spec:
           {{ toYaml . | nindent 10 }}
         {{- end }}
         env:
+        - name: RUNAS_APPUSER
+          value: true
         - name: CB_API_USER
           {{- include "common.secret.fromValueOrSecret" (
                 dict
-                "key" "couchbaseUser"
+                "key" "couchbaseUsername"
                 "secret" (default "couchbase-secret" .Values.couchbaseExistingSecret)
                 "secretKey" (printf "%s%s" (default "" .Values.couchbaseExistingSecretKeyPrefix) "username")
                 "rootContext" . 
           ) | nindent 10 }}
-        - name: FOO
-          value: "{{ include "common.secret.statefulSecretGenerator" (dict "key" "COUCHBASE_URL" "name" "plextracenvsecrets" "namespace" .Release.Namespace) }}"
+        - name: CB_API_PASS
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbasePassword"
+                "secret" (default "couchbase-secret" .Values.couchbaseExistingSecret)
+                "secretKey" (printf "%s%s" (default "" .Values.couchbaseExistingSecretKeyPrefix) "password")
+                "rootContext" . 
+          ) | nindent 10 }}
         envFrom:
         - secretRef:
             name: {{ include "common.names.name" . }}-secret
@@ -61,7 +69,7 @@ spec:
           protocol: TCP
 
         resources:
-          {{- toYaml .Values.resources | nindent 8 }}
+          {{- toYaml .Values.resources | nindent 10 }}
 
         livenessProbe:
           httpGet:

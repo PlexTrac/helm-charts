@@ -18,5 +18,5 @@ volumes:
     storageClassName: local-path
     size: 1Gi
   nocreatepvc:
-    mountpath: /idontexist
+    mountPath: /idontexist
     existing: true

@@ -16,7 +16,11 @@ image:
   pullPolicy: Always
   tag: ""
 
+# -- List of secrets that can be used to pull containers from private registries
+# Reference https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials
+# This must exist!
 imagePullSecrets: []
+# - name: regcred
 
 service:
   type: ClusterIP
@@ -57,6 +61,7 @@ appSecrets: {}
 
 # -- Application specific environment variables
 appEnvVars:
+  CB_BUCKET: reportMe
 # ADMIN_EMAIL: ""
 # OVERRIDE_...: ""
 
