@@ -11,9 +11,11 @@ spec:
     matchLabels:
       {{- include "common.labels.selectorLabels" . | nindent 6 }}
   strategy:
-    # TODO: update this based on replicas/auto scaling.
-    # We should be able to infer some reasonable defaults also for redis, etc
+    {{- if gt (.Values.replicas | default 1 | int) 1 }}
+    type: RollingUpdate
+    {{- else }}
     type: Recreate
+    {{- end }}
   template:
     metadata:
       labels:

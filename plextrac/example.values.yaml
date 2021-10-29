@@ -5,10 +5,12 @@ global:
 image:
   repository: plextrac/plextracapi
   pullPolicy: Always
-  tag: ""
+  tag: "edge"
 
 imagePullSecrets:
   - name: docker-registry-token-plextracusers-ro
+
+replicas: 3
 
 volumes:
   exports:
@@ -18,31 +20,3 @@ volumes:
   nocreatepvc:
     mountpath: /idontexist
     existing: true
-
-service:
-  type: ClusterIP
-  port: 4350
-
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-
-resources:
-  requests:
-    memory: 100Mi
-    cpu: 100m
-  limits: {}
-
-redis:
-  enabled: true
-  redisPass: "fakepass"
-
-couchbase:
-  enabled: true
-  couchbaseUser: cbhelmuser
-  couchbasePass: cbhelmpass
-
-cockroachdb:
-  enabled: false
-
