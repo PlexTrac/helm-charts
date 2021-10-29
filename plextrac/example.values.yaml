@@ -5,7 +5,7 @@ global:
 image:
   repository: plextrac/plextracapi
   pullPolicy: Always
-  tag: "edge"
+  tag: ""
 
 imagePullSecrets:
   - name: docker-registry-token-plextracusers-ro
@@ -17,6 +17,3 @@ volumes:
     mountPath: /usr/src/plextrac-api/exports
     storageClassName: local-path
     size: 1Gi
-  nocreatepvc:
-    mountPath: /idontexist
-    existing: true

@@ -33,7 +33,7 @@ spec:
         {{- end }}
         env:
         - name: RUNAS_APPUSER
-          value: true
+          value: "true"
         - name: CB_API_USER
           {{- include "common.secret.fromValueOrSecret" (
                 dict

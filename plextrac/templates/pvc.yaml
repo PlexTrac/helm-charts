@@ -12,7 +12,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ $spec.storageClassName | default "" }}
+  {{- with $spec.storageClassName }}
+  storageClassName: {{ . | default "" | quote}}
+  {{- end }}
   resources:
     requests:
       storage: {{ $spec.storage | default "5Gi" }}
