@@ -3,6 +3,13 @@ global:
   imagePullSecrets: []
   storageClass: ""
 
+  extraLabels: {}
+
+  redis:
+    # -- Specify redis password for main & sub-chart
+    # overrides
+    password: ""
+
 
 image:
   repository: plextrac/plextracapi
@@ -15,60 +22,59 @@ service:
   type: ClusterIP
   port: 4350
 
+# -- Ingress configuration for the core-backend deployment
+# This should only route requests to /api/
 ingress:
+  # -- Enable Ingress creation
   enabled: false
-  className: {}
+  # -- Configure the Ingress className
+  className: ""
+  # -- Configure Ingress annotations, eg for external-dns, cert-manager, etc
   annotations: {}
-  hosts:
-    - host: plextrac.local
-      paths:
-        - path: /api
-          pathType: Prefix
-  tls: []
+  # -- Define the host used in the Ingress
+  host: plextrac.local
 
 resources:
   requests: {}
   limits: {}
+
+extraLabels:
+  app.kubernetes.io/component: "core-backend"
+
+externalRedisHost: ""
+externalRedisPort: ""
+externalCouchbaseHost: ""
+externalCouchbasePort: ""
 
 core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   # This is technically not a sub-chart. The frontend is useless without the
   # backend (plextracapi) so this is just to keep things organized neatly.
   # As a bonus, we can eventually split this to a CDN (possibly Minio for local?)
   enabled: true
+  nameOverride: ui
   image:
     repository: plextrac/plextracnginx
     pullPolicy: Always
     tag: ""
 
-  ingress:
-    enabled: false
-    className: {}
-    annotations: {}
-    hosts:
-      - host: plextrac.local
-        paths:
-          - path: /api
-            pathType: Prefix
-    tls: []
-
+# -- Configuration for the redis sub-chart
 redis:
   # -- Enables the sub-chart
   enabled: true
-  # -- Configure connection string
-  connectionString: ""
   # -- Specify password for redis connection
-  redisPass: ""
+  password: ""
   # -- Specify existing secret containing redis password
   existingSecret: ""
   # -- Specify lookup key for existing secret
   existingSecretPasswordKey: "redis-password"
 
+# -- Configuration for the couchbase sub-chart
 couchbase:
   enabled: true
 
   couchbaseUser: cbhelmuser
   couchbasePass: cbhelmpass
 
+# -- Configuration for the cockroachdb sub-chart
 cockroachdb:
   enabled: false
-

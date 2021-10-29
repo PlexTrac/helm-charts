@@ -21,14 +21,8 @@ service:
 
 ingress:
   enabled: false
-  className: {}
+  className: ""
   annotations: {}
-  hosts:
-    - host: plextrac-helm.localhost
-      paths:
-        - path: /api
-          pathType: Prefix
-  tls: []
 
 resources:
   requests:

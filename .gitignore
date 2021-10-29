@@ -3,3 +3,5 @@ kubeconfig.yaml
 *.swp
 *.bak
 *.lock
+.vscode
+*.tgz
