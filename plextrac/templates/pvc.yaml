@@ -1,16 +1,21 @@
+{{- $root := . -}}
 {{- with .Values.volumes }}
-{{- range $volume := . }}
+{{- range $name, $spec := . }}
+{{- if not $spec.existing }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ $.Chart.Name }}-{{ .name }}
+  name: {{ $.Chart.Name }}-{{ $name }}
+  labels:
+    {{- include "common.labels" $root | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .storageClassName | default "" }}
+  storageClassName: {{ $spec.storageClassName | default "" }}
   resources:
     requests:
-      storage: {{ .storage | default "5Gi" }}
+      storage: {{ $spec.storage | default "5Gi" }}
+{{- end }}
 {{- end }}
 {{- end }}

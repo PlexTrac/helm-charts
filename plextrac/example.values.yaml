@@ -1,5 +1,6 @@
 global:
   imageRegistry: k3d-registry.localhost:5000
+  couchbaseUser: test
 
 image:
   repository: plextrac/plextracapi
@@ -10,10 +11,13 @@ imagePullSecrets:
   - name: docker-registry-token-plextracusers-ro
 
 volumes:
-  - name: uploads
-    mountPath: /usr/src/plextrac-api/uploads
+  exports:
+    mountPath: /usr/src/plextrac-api/exports
     storageClassName: local-path
     size: 1Gi
+  nocreatepvc:
+    mountpath: /idontexist
+    existing: true
 
 service:
   type: ClusterIP

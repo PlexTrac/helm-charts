@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.name" . }}-configmap
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  data:
+{{/*
+  top level config vars from values should be provided as-is
+*/}}
+{{- range $k, $v := .Values.appEnvVars }}
+    {{ $k }}: {{ $v }}
+{{- end -}}

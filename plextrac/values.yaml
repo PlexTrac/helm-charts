@@ -38,13 +38,50 @@ resources:
   requests: {}
   limits: {}
 
+volumes:
+  uploads:
+    mountPath: /usr/src/plextrac-api/uploads
+    storageClassName: ""
+    storage: ""
+
 extraLabels:
   app.kubernetes.io/component: "core-backend"
 
+# -- Application specific secrets
+appSecrets: {}
+# MFA_KEY: ""
+# JWT_KEY: ""
+# COOKIE_KEY: ""
+# API_INTEGRATION_AUTH_CONFIG: ""
+# PROVIDER_CODE_KEY: ""
+
+# -- Application specific environment variables
+appEnvVars:
+# ADMIN_EMAIL: ""
+# OVERRIDE_...: ""
+
+# -- Enable Sentry reporting
+sentryDSN: ""
+
+# -- Override host for Couchbase connection
+couchbaseHost: ""
+# -- Override port for Couchbase connection
+couchbasePort: ""
+# -- Set username for connection to Couchbase
+# Mainly useful for an external Couchbase instance
+couchbaseUsername: "plextracapiuser"
+# -- Set password for connection to Couchbase
+# Mainly useful for an external Couchbase instance
+couchbasePassword: ""
+# -- Use existing secret for couchbase credentials
+# If unset and no password is provided, default is `couchbase-secret`
+couchbaseExistingSecret: ""
+# -- Use prefix to extract username & password from existing secret 
+couchbaseExistingSecretKeyPrefix: ""
+
+ 
 externalRedisHost: ""
 externalRedisPort: ""
-externalCouchbaseHost: ""
-externalCouchbasePort: ""
 
 core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   # This is technically not a sub-chart. The frontend is useless without the
@@ -52,10 +89,16 @@ core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   # As a bonus, we can eventually split this to a CDN (possibly Minio for local?)
   enabled: true
   nameOverride: ui
+  extraLabels:
+    app.kubernetes.io/component: "core-frontend"
   image:
     repository: plextrac/plextracnginx
     pullPolicy: Always
     tag: ""
+
+  service:
+    type: ClusterIP
+    port: 8443  # the current container enforces HTTPS
 
 # -- Configuration for the redis sub-chart
 redis:

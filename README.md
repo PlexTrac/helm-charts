@@ -194,6 +194,9 @@ in predictably named Secrets.
 
 #### Generating Credentials
 
+**Note**: This does not work with ArgoCD. `helm template` does not have access to lookup
+kubernetes resources, so a fresh secret will be generated every sync. _Not great_.
+
 If no credentials are provided, first do a `lookup` to see if the default Secret has already been
 created. Then generate credentials. [Here's](https://github.com/helm/charts/issues/5167) a useful
 example of how this is done.

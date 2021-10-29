@@ -5,7 +5,6 @@ metadata:
   name: {{ include "common.names.name" . }}
   labels:
     {{- include "common.labels" .  | nindent 4 }}
-    app.kubernetes.io/component: "core-backend"
 spec:
   type: {{ .Values.service.type }}
   ports:
