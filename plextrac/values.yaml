@@ -52,12 +52,12 @@ extraLabels:
   app.kubernetes.io/component: "core-backend"
 
 # -- Application specific secrets
-appSecrets: {}
+appSecrets:
 # MFA_KEY: ""
 # JWT_KEY: ""
 # COOKIE_KEY: ""
 # API_INTEGRATION_AUTH_CONFIG: ""
-# PROVIDER_CODE_KEY: ""
+  PROVIDER_CODE_KEY: "foo"
 
 # -- Application specific environment variables
 appEnvVars:
@@ -74,7 +74,7 @@ couchbaseHost: ""
 couchbasePort: ""
 # -- Set username for connection to Couchbase
 # Mainly useful for an external Couchbase instance
-couchbaseUsername: "plextracapiuser"
+couchbaseUsername: ""
 # -- Set password for connection to Couchbase
 # Mainly useful for an external Couchbase instance
 couchbasePassword: ""
@@ -120,8 +120,8 @@ redis:
 couchbase:
   enabled: true
 
-  couchbaseUser: cbhelmuser
-  couchbasePass: cbhelmpass
+  couchbaseUsername: cbhelmuser
+  couchbasePassword: cbhelmpass
 
 # -- Configuration for the cockroachdb sub-chart
 cockroachdb:

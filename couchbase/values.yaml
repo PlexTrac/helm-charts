@@ -1,0 +1,28 @@
+global: {}
+
+image:
+  repository: plextrac/plextracdb
+
+volumes:
+  data:
+    mountPath: /opt/couchbase/var
+    storage: 5Gi
+
+resources:
+  requests:
+    cpu: 2
+    memory: 8Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
+
+nameOverride: ""
+fullNameOverride: ""
+
+createCouchbaseSecret: false
+couchbaseUsername: ""
+couchbasePassword: ""
+
+createCouchbaseAdminSecret: false
+couchbaseAdminUsername: ""
+couchbaseAdminPassword: ""

@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "common.labels" . | nindent 4 }}
 data:
-{{/*
+{{- /*
   top level config vars from values should be provided as-is
 */}}
 {{- range $k, $v := .Values.appEnvVars }}

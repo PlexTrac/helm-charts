@@ -1,19 +1,2 @@
 global:
   imageRegistry: k3d-registry.localhost:5000
-  couchbaseUser: test
-
-image:
-  repository: plextrac/plextracapi
-  pullPolicy: Always
-  tag: ""
-
-imagePullSecrets:
-  - name: docker-registry-token-plextracusers-ro
-
-replicas: 3
-
-volumes:
-  exports:
-    mountPath: /usr/src/plextrac-api/exports
-    storageClassName: local-path
-    size: 1Gi

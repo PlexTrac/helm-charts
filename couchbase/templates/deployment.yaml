@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 3 }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ include "common.names.name" . }}
+        image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.command }}
+        command:
+          {{ toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              name: couchbase-secret
+              key: username
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              name: couchbase-secret
+              key: password
+        envFrom:
+        - secretRef:
+            name: {{ include "common.names.name" . }}-secret
+        - secretRef:
+            name: {{ include "common.names.name" . }}-admin-secret
+        {{- with .Values.volumes }}
+        volumeMounts:
+        {{- range $name, $spec := . }}
+        - mountPath: {{ $spec.mountPath }}
+          name: {{ $name }}
+        {{- end }}
+        {{- end }}
+
+        ports:
+        - name: http
+          containerPort: 8091
+          protocol: TCP
+        - containerPort: 8092
+        - containerPort: 8093
+        - containerPort: 8094
+        - containerPort: 11210
+
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+
+        #livenessProbe:
+        # httpGet:
+        #   path:  /api/v2/health/live
+        #   port: 4350
+        # initialDelaySeconds: 10
+        # timeoutSeconds: 10
+        # failureThreshold: 6
+        #readinessProbe:
+        # httpGet:
+        #   path:  /api/v2/health/full
+        #   port: 4350
+        # initialDelaySeconds: 10
+        # timeoutSeconds: 10
+        # failureThreshold: 6
+
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{ toYaml . | nindent 8 }}
+      {{- end -}}
+
+      
+      {{- with .Values.volumes }}
+      volumes:
+        {{- range $name, $spec := . }}
+      - name: {{ $name }}
+        persistentVolumeClaim:
+          claimName: {{ $.Chart.Name }}-{{ $name }}
+      {{- end }}
+      {{- end }}
+
+      restartPolicy: Always

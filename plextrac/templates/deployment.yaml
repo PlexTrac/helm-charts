@@ -34,6 +34,10 @@ spec:
         env:
         - name: RUNAS_APPUSER
           value: "true"
+        {{- with .Values.sentryDSN }}
+        - name: SENTRY_DSN_BACKEND
+          value: {{ . | quote}}
+        {{- end }}
         - name: CB_API_USER
           {{- include "common.secret.fromValueOrSecret" (
                 dict
@@ -50,6 +54,24 @@ spec:
                 "secretKey" (printf "%s%s" (default "" .Values.couchbaseExistingSecretKeyPrefix) "password")
                 "rootContext" . 
           ) | nindent 10 }}
+        - name: CB_ADMIN_USER
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbaseAdminUsername"
+                "secret" (default "couchbase-admin-secret" .Values.couchbaseExistingSecret)
+                "secretKey" "CB_ADMIN_USER"
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: CB_ADMIN_PASS
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbaseAdminPassword"
+                "secret" (default "couchbase-admin-secret" .Values.couchbaseExistingSecret)
+                "secretKey" "CB_ADMIN_PASS"
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: COUCHBASE_URL
+          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "couchbase") .) }}
         envFrom:
         - secretRef:
             name: {{ include "common.names.name" . }}-secret

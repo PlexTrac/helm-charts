@@ -11,6 +11,10 @@ version: 0.1.0
 appVersion: "stable"
 
 dependencies:
+- name: couchbase
+  condition: couchbase.enabled
+  version: "~0.1"
+  repository: "file://../couchbase"
 - name: common
   version: "~0.1"
   repository: "file://../common"
