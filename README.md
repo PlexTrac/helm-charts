@@ -194,16 +194,17 @@ in predictably named Secrets.
 
 #### Generating Credentials
 
-**Note**: This does not work with ArgoCD. `helm template` does not have access to lookup
-kubernetes resources, so a fresh secret will be generated every sync. _Not great_.
+_Don't be clever_
 
-If no credentials are provided, first do a `lookup` to see if the default Secret has already been
-created. Then generate credentials. [Here's](https://github.com/helm/charts/issues/5167) a useful
-example of how this is done.
+I started out trying a clever method of storing off credentials and looking them up when generating
+the manifests. This probably works fine for folks manually installing via Helm, but for most use
+cases the process will be handed off to another tool (eg, ArgoCD). It was a headache.
 
-This is provided as a helper template in the `common` library chart as
-`common.secret.statefulSecretGenerator`.
-
+The tactic I have chosen is instead to put any credential generation behind a flag that is default
+false (eg, `createCouchbaseSecret`). On initial installation, simply pass
+`--set couchbase.createCouchbaseSecret` so the credentials are configured. These secrets are
+annotated `helm.sh/resource-policy: keep`. This ensures that Helm will _create_ but not _delete_
+the secret. This does orphan the resource, but _that's showbiz_ I guess.
 
 # Labels & Annotations
 

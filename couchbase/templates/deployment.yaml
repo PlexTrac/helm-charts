@@ -25,20 +25,7 @@ spec:
         command:
           {{ toYaml . | nindent 10 }}
         {{- end }}
-        env:
-        - name: CB_API_USER
-          valueFrom:
-            secretKeyRef:
-              name: couchbase-secret
-              key: username
-        - name: CB_API_PASS
-          valueFrom:
-            secretKeyRef:
-              name: couchbase-secret
-              key: password
         envFrom:
-        - secretRef:
-            name: {{ include "common.names.name" . }}-secret
         - secretRef:
             name: {{ include "common.names.name" . }}-admin-secret
         {{- with .Values.volumes }}
