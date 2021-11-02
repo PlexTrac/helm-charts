@@ -17,10 +17,7 @@ app.kubernetes.io/instance: {{ include "common.names.fullname" . }}
 
 
 {{- define "common.labels.extraLabels" }}
-{{- $extraLabels := .Values.global.extraLabels -}}
-{{- if .Values.extraLabels -}}
-{{- $extraLabels = merge $extraLabels .Values.extraLabels -}}
-{{- end -}}
+{{- $extraLabels := merge dict .Values.global.extraLabels (default dict .Values.extraLabels) -}}
 {{- range $key, $value := $extraLabels }}
 {{ $key }}: {{ $value }}
 {{- end -}}

@@ -4,17 +4,26 @@ Some dependencies may still be starting up, please check for readiness:
   $ helm status {{ .Release.Name }}
   $ helm get all {{ .Release.Name }}
 
-{{ if .Values.ingress.enabled }}
+{{- if .Values.ingress.enabled }}
+
 You have configured an external Ingress. To connect, navigate to
 https://{{ .Values.ingress.host }}/ in your web browser.
-{{ else }}
+
+{{- else }}
+
 You have not configured an external Ingress. To connect, establish a port-forward connection to the
 application as shown below, then navigate to http://localhost:8443/ in your web browser.
 
-  $ kubectl port-forward --namespace {{ .Release.Namespace }} service/{{ include "common.names.fullname" . }}-ui 8443
-{{ end }}
+{{- include "context.core-frontend" . }}
+{{- with .Contexts.coreFrontend }}
+
+  $ kubectl port-forward --namespace {{ .Release.Namespace }} service/{{ include "common.names.name" . }} 8443:443
+
+{{- end }}
+{{- end }}
 
 To retrieve the default username/password required for setup, run the following command:
+
   $ kubectl get secret --namespace {{ .Release.Namespace }} initial-secret -o \
       go-template='{{ printf "{{ .data.adminUsername | base64decode }}:{{ .data.adminPassword | base64decode }}{{\"\\n\"}}" }}'
 

@@ -1,0 +1,24 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels" .  | nindent 4 }}
+  annotations:
+    {{- toYaml (default (dict "annotations" dict) .Values.ingress).annotations | nindent 4 }}
+spec:
+  {{- /* #TODO: investigate using a defaultBackend on the main Ingress using a StorageBucket (Minio?) to serve static files */}}
+  {{- with list (.Values.ingress).className .Values.global.ingressClassName | compact | first }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+  - http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "common.names.name" . }}
+            port:
+              number: 4350

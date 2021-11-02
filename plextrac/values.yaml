@@ -1,4 +1,5 @@
 global:
+  ingressClassName: ""
   imageRegistry: ""
   imagePullSecrets: []
   storageClass: ""
@@ -93,7 +94,7 @@ core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   # backend (plextracapi) so this is just to keep things organized neatly.
   # As a bonus, we can eventually split this to a CDN (possibly Minio for local?)
   enabled: true
-  nameOverride: ui
+  replicas: 2
   extraLabels:
     app.kubernetes.io/component: "core-frontend"
   image:
