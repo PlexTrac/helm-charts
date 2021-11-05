@@ -8,6 +8,17 @@ description: README
 
 These are the helm charts used to deploy the PlexTrac application.
 
+## Development
+
+### Tips & Tricks
+
+**Templating**
+
+If you're want to see the output of a single template, just do
+
+```bash
+helm template -n NAMESPACE RELEASE_NAME -s templates/TEMPLATE.yaml CHART_DIR | yq e
+```
 # QuickStart
 
 ## Pre-Requisites

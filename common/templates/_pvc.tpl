@@ -1,7 +1,10 @@
+{{/* Generic template for PVC */}}
+{{- define "common.storage.pvc" }}
+
 {{- $root := . -}}
 {{- with .Values.volumes }}
-{{- range $name, $spec := . }}
-{{- if not $spec.existing }}
+  {{- range $name, $spec := . }}
+    {{- if not $spec.existing }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -11,13 +14,14 @@ metadata:
     {{- include "common.labels" $root | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    {{- default (list "ReadWriteOnce") $spec.accessModes | toYaml | nindent 4 }}
   {{- with $spec.storageClassName }}
   storageClassName: {{ . | default "" | quote}}
   {{- end }}
   resources:
     requests:
       storage: {{ $spec.storage | default "5Gi" }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}

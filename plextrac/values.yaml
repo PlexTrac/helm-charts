@@ -2,6 +2,7 @@ global:
   ingressClassName: ""
   imageRegistry: ""
   imagePullSecrets: []
+  registryCredentials: []
   storageClass: ""
 
   extraLabels: {}
@@ -22,6 +23,8 @@ image:
 # This must exist!
 imagePullSecrets: []
 # - name: regcred
+
+registryCredentials: []
 
 service:
   type: ClusterIP
@@ -48,6 +51,8 @@ volumes:
     mountPath: /usr/src/plextrac-api/uploads
     storageClassName: ""
     storage: ""
+    accessModes:
+      - ReadWriteMany
 
 extraLabels:
   app.kubernetes.io/component: "core-backend"
