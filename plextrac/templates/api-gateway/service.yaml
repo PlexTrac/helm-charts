@@ -1,7 +1,9 @@
+{{/*
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  # Temporarily required due to hardcoded service lookup in UI
   name: plextracapi
   labels:
     {{- include "common.labels" .  | nindent 4 }}
@@ -19,7 +21,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "common.names.name" . }}
+  name: plextracapi
   labels:
     {{- include "common.labels" .  | nindent 4 }}
 spec:
@@ -31,3 +33,4 @@ spec:
     name: http-plextracapi
   selector:
     {{- include "common.labels.selectorLabels" . | nindent 4 }}
+*/}}

@@ -1,6 +1,8 @@
 apiVersion: v2
 name: plextrac
 description: Deploys the PlexTrac application & any required dependencies
+home: https://github.com/PlexTrac/helm-charts
+icon: https://plextrac.com/wp-content/uploads/2021/10/cropped-PlexTrac-Symbol-Small-Use-192x192.png
 
 type: application
 
@@ -11,10 +13,13 @@ version: 0.1.0
 appVersion: "stable"
 
 dependencies:
+- name: common
+  version: "~0.1"
+  repository: "file://../common"
 - name: couchbase
   condition: couchbase.enabled
   version: "~0.1"
   repository: "file://../couchbase"
-- name: common
+- name: redis
   version: "~0.1"
-  repository: "file://../common"
+  repository: "file://../redis"

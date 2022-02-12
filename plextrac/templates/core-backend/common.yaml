@@ -1,0 +1,4 @@
+{{- include "context.core-backend" . }}
+{{- with .Contexts.coreBackend }}
+{{- include "common.storage.pvc" . }}
+{{- end }}

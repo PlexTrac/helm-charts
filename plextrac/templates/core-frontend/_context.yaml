@@ -1,0 +1,8 @@
+{{- define "context.core-frontend" }}
+{{- if not (.Contexts).coreFrontend }}
+{{- $frontendContext := dict "Chart" .Chart "Release" .Release "Values" (index .Values "core-frontend" | deepCopy) }}
+{{- $_ := set $frontendContext.Values "global" .Values.global }}
+{{- $_ := set $frontendContext.Values "nameOverride" (default "core-frontend" $frontendContext.Values.nameOverride) }}
+{{- $_ := merge $ (dict "Contexts" (dict "coreFrontend" $frontendContext)) }}
+{{- end }}
+{{- end }}

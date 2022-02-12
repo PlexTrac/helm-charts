@@ -20,7 +20,7 @@ spec:
   {{- end }}
   resources:
     requests:
-      storage: {{ $spec.storage | default "5Gi" }}
+      storage: {{ $spec.storage | default "1Gi" }}
     {{- end }}
   {{- end }}
 {{- end }}

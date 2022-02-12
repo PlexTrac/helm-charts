@@ -1,8 +1,7 @@
 {{/*
     Generate an image name from parameters
     Usage:
-
-        {{ include "common.images.image" (dict "local" .Values.image "global" $)}}
+      {{ include "common.images.image" (dict "local" .Values.image "global" $)}}
 */}}
 {{- define "common.images.image" -}}
   {{/* Set local variables that we update later if necessary */}}
@@ -29,7 +28,6 @@
       - common.images.pullSecrets
       - common.images.registryCredentials
 */}}
-
 {{- define "common.images.pullSecrets" }}
 {{- $managedSecrets := concat .Values.registryCredentials .Values.global.registryCredentials | uniq }}
 {{- $pullSecrets := concat .Values.imagePullSecrets .Values.global.imagePullSecrets | uniq }}

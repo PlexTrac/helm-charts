@@ -1,3 +1,5 @@
+{{- include "context.core-backend" . }}
+{{- with .Contexts.coreBackend }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +13,4 @@ data:
 {{- range $k, $v := .Values.appEnvVars }}
   {{ $k }}: {{ $v }}
 {{- end -}}
+{{- end }}

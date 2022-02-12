@@ -1,2 +1,25 @@
 global:
+  registryCredentials:
+    - registry: foo
+      username: myuser
+      password: sekrit
   imageRegistry: k3d-registry.localhost:5000
+  imagePullSecrets:
+    - name: foo
+registryCredentials:
+- registry: core.harbor.plextrac.ninja
+  username: ptbot
+  password: foobarbat
+imagePullSecrets:
+  - name: bar
+  - name: foo
+
+core-backend:
+  appSecrets:
+    MFA_KEY: "foo"
+    JWT_KEY: "bar"
+    COOKIE_KEY: "bat"
+
+  appEnvVars:
+    LOG_LEVEL: debug
+    NODE_ENV: dev

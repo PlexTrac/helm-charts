@@ -13,11 +13,6 @@ global:
     password: ""
 
 
-image:
-  repository: plextrac/plextracapi
-  pullPolicy: Always
-  tag: ""
-
 # -- List of secrets that can be used to pull containers from private registries
 # Reference https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials
 # This must exist!
@@ -28,7 +23,7 @@ registryCredentials: []
 
 service:
   type: ClusterIP
-  port: 4350
+  port: 8080
 
 # -- Ingress configuration for the core-backend deployment
 # This should only route requests to /api/
@@ -42,57 +37,68 @@ ingress:
   # -- Define the host used in the Ingress
   host: plextrac.local
 
-resources:
-  requests: {}
-  limits: {}
 
-volumes:
-  uploads:
-    mountPath: /usr/src/plextrac-api/uploads
-    storageClassName: ""
-    storage: ""
-    accessModes:
-      - ReadWriteMany
+core-backend:
+  extraLabels:
+    app.kubernetes.io/component: "core-backend"
 
-extraLabels:
-  app.kubernetes.io/component: "core-backend"
+  image:
+    repository: plextrac/plextracapi
+    pullPolicy: Always
+    tag: ""
 
-# -- Application specific secrets
-appSecrets:
-# MFA_KEY: ""
-# JWT_KEY: ""
-# COOKIE_KEY: ""
-# API_INTEGRATION_AUTH_CONFIG: ""
-  PROVIDER_CODE_KEY: "foo"
+  service:
+    type: ClusterIP
+    port: 4350
 
-# -- Application specific environment variables
-appEnvVars:
-  CB_BUCKET: reportMe
-# ADMIN_EMAIL: ""
-# OVERRIDE_...: ""
+  resources:
+    requests: {}
+    limits: {}
 
-# -- Enable Sentry reporting
-sentryDSN: ""
+  volumes:
+    uploads:
+      mountPath: /usr/src/plextrac-api/uploads
+      storageClassName: ""
+      storage: ""
+      accessModes:
+        - ReadWriteMany
 
-# -- Override host for Couchbase connection
-couchbaseHost: ""
-# -- Override port for Couchbase connection
-couchbasePort: ""
-# -- Set username for connection to Couchbase
-# Mainly useful for an external Couchbase instance
-couchbaseUsername: ""
-# -- Set password for connection to Couchbase
-# Mainly useful for an external Couchbase instance
-couchbasePassword: ""
-# -- Use existing secret for couchbase credentials
-# If unset and no password is provided, default is `couchbase-secret`
-couchbaseExistingSecret: ""
-# -- Use prefix to extract username & password from existing secret 
-couchbaseExistingSecretKeyPrefix: ""
+  # -- Application specific secrets
+  appSecrets:
+  # MFA_KEY: ""
+  # JWT_KEY: ""
+  # COOKIE_KEY: ""
+  # API_INTEGRATION_AUTH_CONFIG: ""
+    PROVIDER_CODE_KEY: "foo"
 
- 
-externalRedisHost: ""
-externalRedisPort: ""
+  # -- Application specific environment variables
+  appEnvVars:
+    CB_BUCKET: reportMe
+  # ADMIN_EMAIL: ""
+  # OVERRIDE_...: ""
+
+  # -- Enable Sentry reporting
+  sentryDSN: ""
+
+  # -- Override host for Couchbase connection
+  couchbaseHost: ""
+  # -- Override port for Couchbase connection
+  couchbasePort: ""
+  # -- Set username for connection to Couchbase
+  # Mainly useful for an external Couchbase instance
+  couchbaseUsername: ""
+  # -- Set password for connection to Couchbase
+  # Mainly useful for an external Couchbase instance
+  couchbasePassword: ""
+  # -- Use existing secret for couchbase credentials
+  # If unset and no password is provided, default is `couchbase-secret`
+  couchbaseExistingSecret: ""
+  # -- Use prefix to extract username & password from existing secret 
+  couchbaseExistingSecretKeyPrefix: ""
+
+  
+  externalRedisHost: ""
+  externalRedisPort: ""
 
 core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   # This is technically not a sub-chart. The frontend is useless without the
@@ -129,6 +135,6 @@ couchbase:
   couchbaseUsername: cbhelmuser
   couchbasePassword: cbhelmpass
 
-# -- Configuration for the cockroachdb sub-chart
-cockroachdb:
+# -- Configuration for the postgres sub-chart
+postgres:
   enabled: false

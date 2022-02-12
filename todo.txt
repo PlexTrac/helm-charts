@@ -8,3 +8,4 @@ Reference gitlab helm info on secrets, etc 'https://docs.gitlab.com/charts/insta
 ref gitlab job for tasks that need to happen like creating buckets, running migrations, etc 'https://gitlab.com/gitlab-org/charts/gitlab/-/blob/master/charts/minio/templates/create-buckets-job.yaml'
 convert redis to use a statefulset allowing single node or HA mode
 Look at harbor 'https://goharbor.io' for internal container/helm registry
+support directly passing locale overrides

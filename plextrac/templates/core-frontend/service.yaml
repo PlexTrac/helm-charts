@@ -1,0 +1,23 @@
+{{- include "context.core-frontend" . }}
+{{- with .Contexts.coreFrontend }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.names.name" . }}
+  labels:
+    {{- include "common.labels" .  | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: 443
+    protocol: TCP
+    name: https
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "common.labels.selectorLabels" . | nindent 4 }}
+{{- end }}

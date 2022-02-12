@@ -15,10 +15,19 @@ spec:
   rules:
   - http:
       paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "common.names.dependencyName" (merge (dict "dependency" "core-frontend") $) }}
+            port:
+              number: {{ (get .Values "core-frontend").service.port }}
+  - http:
+      paths:
       - path: /api
         pathType: Prefix
         backend:
           service:
-            name: {{ include "common.names.name" . }}
+            name: {{ include "common.names.dependencyName" (merge (dict "dependency" "core-backend") $) }}
             port:
-              number: 4350
+              number: {{ (get .Values "core-backend").service.port }}

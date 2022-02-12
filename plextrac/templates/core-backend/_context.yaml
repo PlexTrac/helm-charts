@@ -1,0 +1,8 @@
+{{- define "context.core-backend" }}
+{{- if not (.Contexts).coreBackend }}
+{{- $backendContext := dict "Chart" .Chart "Release" .Release "Values" (index .Values "core-backend" | deepCopy) }}
+{{- $_ := set $backendContext.Values "global" .Values.global }}
+{{- $_ := set $backendContext.Values "nameOverride" (default "core-backend" $backendContext.Values.nameOverride) }}
+{{- $_ := merge $ (dict "Contexts" (dict "coreBackend" $backendContext)) }}
+{{- end }}
+{{- end }}

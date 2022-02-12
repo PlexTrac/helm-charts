@@ -1,3 +1,6 @@
+{{- include "context.core-backend" . }}
+{{- with .Contexts.coreBackend }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -71,7 +74,9 @@ spec:
                 "rootContext" . 
           ) | nindent 10 }}
         - name: COUCHBASE_URL
-          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "couchbase") .) }}
+          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "couchbase") $) }}
+        - name: CLIENT_DOMAIN_NAME
+          value: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
         envFrom:
         - secretRef:
             name: {{ include "common.names.name" . }}-secret
@@ -108,7 +113,7 @@ spec:
           timeoutSeconds: 10
           failureThreshold: 6
 
-      {{- include "common.images.pullSecrets" . | nindent 6 }}
+      {{- include "common.images.pullSecrets" $ | nindent 6 }}
       
       {{- with .Values.volumes }}
       volumes:
@@ -120,4 +125,4 @@ spec:
       {{- end }}
 
       restartPolicy: Always
-
+{{- end }}

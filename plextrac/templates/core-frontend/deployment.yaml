@@ -1,0 +1,58 @@
+{{- include "context.core-frontend" . }}
+{{- with .Contexts.coreFrontend }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas | default 1 }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 3 }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.selectorLabels" . | nindent 6 }}
+  strategy:
+    {{- if gt (.Values.replicas | default 1 | int) 1 }}
+    type: RollingUpdate
+    {{- else }}
+    type: Recreate
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels" . | nindent 8 }}
+    spec:
+      containers:
+        # TODO: add init container that can bootstrap the DB if necessary (for
+        # demo, single node, etc)
+      - name: {{ include "common.names.name" . }}
+        image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.command }}
+        command:
+          {{ toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+        {{- with .Values.sentryDSN }}
+        - name: SENTRY_DSN_FRONTEND
+          value: {{ . | quote}}
+        {{- end }}
+        - name: CLIENT_DOMAIN_NAME
+          value: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
+        ports:
+        - name: https
+          containerPort: 443
+          protocol: TCP
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{ toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+{{- end }}
