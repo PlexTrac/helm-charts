@@ -69,7 +69,7 @@ core-backend:
   # JWT_KEY: ""
   # COOKIE_KEY: ""
   # API_INTEGRATION_AUTH_CONFIG: ""
-    PROVIDER_CODE_KEY: "foo"
+  # PROVIDER_CODE_KEY: ""
 
   # -- Application specific environment variables
   appEnvVars:
