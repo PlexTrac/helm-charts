@@ -4,6 +4,6 @@ description: Installs Couchbase for the PlexTrac application
 type: application
 
 # Represents the chart revision
-version: 0.1.0
+version: 0.1.1
 # Uses the "stable" tag for PlexTrac images
 appVersion: "6.5.1"
