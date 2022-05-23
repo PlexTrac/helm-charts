@@ -46,3 +46,4 @@ spec:
         envFrom:
         - secretRef:
             name: {{ include "common.names.name" . }}-admin-secret
+      {{- include "common.images.pullSecrets" $ | nindent 6 }}

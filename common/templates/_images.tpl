@@ -29,8 +29,8 @@
       - common.images.registryCredentials
 */}}
 {{- define "common.images.pullSecrets" }}
-{{- $managedSecrets := concat .Values.registryCredentials .Values.global.registryCredentials | uniq }}
-{{- $pullSecrets := concat .Values.imagePullSecrets .Values.global.imagePullSecrets | uniq }}
+{{- $managedSecrets := concat (.Values.registryCredentials | default list) .Values.global.registryCredentials | uniq }}
+{{- $pullSecrets := concat (.Values.imagePullSecrets | default list) .Values.global.imagePullSecrets | uniq }}
   {{- with $pullSecrets }}
 imagePullSecrets:
   {{- toYaml . | nindent 2 }}
