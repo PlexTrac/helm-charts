@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.name" . }}
+  labels:
+    {{- include "common.labels" .  | nindent 4 }}
+    app.kubernetes.io/component: redis-primary
+spec:
+  replicas: 1
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 3 }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis-primary
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels" . | nindent 8 }}
+        app.kubernetes.io/component: redis-primary
+    spec:
+      containers:
+      - name: {{ include "common.names.name" . }}
+        image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.command | default (list "redis-server") }}
+        command:
+          {{ toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.args | default (list "--requirepass $(REDIS_PASSWORD)") }}
+        args:
+          {{ toYaml . | nindent 10 }}
+        {{- end }}
+        env:
+        - name: REDIS_PASSWORD
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "password"
+                "secret" (default "redis-secret" .Values.redisExistingSecret)
+                "secretKey" (default "password" .Values.redisExistingSecretKey)
+                "rootContext" . 
+          ) | nindent 10 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        ports:
+        - containerPort: 6379
+        {{- with .Values.volumes }}
+        volumeMounts:
+        {{- range $name, $spec := . }}
+        - mountPath: {{ $spec.mountPath }}
+          name: {{ $name }}
+        {{- end }}
+        {{- end }}
+      {{- include "common.images.pullSecrets" $ | nindent 6 }}
+
+      {{- with .Values.volumes }}
+      volumes:
+        {{- range $name, $spec := . }}
+      - name: {{ $name }}
+        persistentVolumeClaim:
+          claimName: {{ $.Chart.Name }}-{{ $name }}
+      {{- end }}
+      {{- end }}
+      restartPolicy: Always

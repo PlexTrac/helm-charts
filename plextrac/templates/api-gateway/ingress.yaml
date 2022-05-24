@@ -13,7 +13,8 @@ spec:
   ingressClassName: {{ . }}
   {{- end }}
   rules:
-  - http:
+  - host: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
+    http:
       paths:
       - path: /
         pathType: Prefix
@@ -22,12 +23,3 @@ spec:
             name: {{ include "common.names.dependencyName" (merge (dict "dependency" "core-frontend") $) }}
             port:
               number: {{ (get .Values "core-frontend").service.port }}
-  - http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ include "common.names.dependencyName" (merge (dict "dependency" "core-backend") $) }}
-            port:
-              number: {{ (get .Values "core-backend").service.port }}

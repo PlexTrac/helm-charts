@@ -23,6 +23,9 @@ spec:
     metadata:
       labels:
         {{- include "common.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/core-backend/configmap.yaml") $ | sha256sum }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/core-backend/secret.yaml") $ | sha256sum }}
     spec:
       containers:
         # TODO: add init container that can bootstrap the DB if necessary (for
@@ -75,8 +78,22 @@ spec:
           ) | nindent 10 }}
         - name: COUCHBASE_URL
           value: {{ include "common.names.dependencyName" (merge (dict "dependency" "couchbase") $) }}
+        - name: REDIS_CONNECTION_STRING
+          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "redis") $) }}
         - name: CLIENT_DOMAIN_NAME
           value: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
+        {{- if gt (.Values.replicas | default 1 | int) 1 }}
+        - name: OVERRIDE_HIGH_AVAILABILITY
+          value: 'true'
+        {{- end }}
+        - name: REDIS_PASSWORD
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "password"
+                "secret" (default "redis-secret" .Values.redisExistingSecret)
+                "secretKey" (default "password" .Values.redisExistingSecretKey)
+                "rootContext" . 
+          ) | nindent 10 }}
         envFrom:
         - secretRef:
             name: {{ include "common.names.name" . }}-secret

@@ -1,9 +1,11 @@
-{{/*
+{{- include "context.core-backend" . }}
+{{- with .Contexts.coreBackend }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  # Temporarily required due to hardcoded service lookup in UI
+  # Adds a hardcoded local dns entry due to a legacy
+  # requirement of the plextracnginx configuration
   name: plextracapi
   labels:
     {{- include "common.labels" .  | nindent 4 }}
@@ -13,24 +15,7 @@ spec:
   - port: {{ .Values.service.port }}
     targetPort: 4350
     protocol: TCP
-    name: http-plextracapi
+    name: http-{{ include "common.names.name" . }}
   selector:
     {{- include "common.labels.selectorLabels" . | nindent 4 }}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: plextracapi
-  labels:
-    {{- include "common.labels" .  | nindent 4 }}
-spec:
-  type: {{ .Values.service.type }}
-  ports:
-  - port: {{ .Values.service.port }}
-    targetPort: 4350
-    protocol: TCP
-    name: http-plextracapi
-  selector:
-    {{- include "common.labels.selectorLabels" . | nindent 4 }}
-*/}}
+{{- end }}

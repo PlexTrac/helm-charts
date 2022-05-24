@@ -1,0 +1,24 @@
+global: {}
+
+image:
+  repository: library/redis
+  tag: 6.2-alpine
+
+volumes:
+  data:
+    mountPath: /data
+    storage: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+
+nameOverride: ""
+fullNameOverride: ""
+
+createRedisSecret: false
+password: ""
