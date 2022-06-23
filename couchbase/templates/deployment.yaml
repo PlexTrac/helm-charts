@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +18,47 @@ spec:
       labels:
         {{- include "common.labels" . | nindent 8 }}
     spec:
+      restartPolicy: Always
       containers:
+      - name: {{ include "common.names.name" . }}-init-users
+        image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
+        command:
+        - "/bin/bash"
+        - "-c"
+        args:
+        - |
+          while true; do
+            echo "Connecting to $COUCHBASE:8091 to see if it's initialized"
+            bucketReady=`curl -s --head -X GET -u "$CB_ADMIN_USER":"$CB_ADMIN_PASS" -H "Content-Type: application/json" $COUCHBASE:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
+            if [ $bucketReady -eq 1 ]; then break; else sleep 5; fi
+          done
+          echo "$COUCHBASE:8091 is ready, checking for app user"
+          userExists=`curl -s --head -X GET -u $CB_API_USER:$CB_API_PASS -H "Content-Type: application/json" $COUCHBASE:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
+          if [ $userExists -eq 1 ]; then echo "App user exists, nothing to do"; exit 0; fi
+          echo "Setting up app user"
+          couchbase-cli user-manage --set -c $COUCHBASE:8091 -u $CB_ADMIN_USER -p $CB_ADMIN_PASS --rbac-username $CB_API_USER --rbac-password $CB_API_PASS --rbac-name "PlexTrac API User" --roles bucket_full_access[reportMe] --auth-domain local
+          echo "Users initialization complete"
+          while true; do
+            sleep 600
+            echo "Sidecar sleeping..."
+          done
+        env:
+        - name: COUCHBASE
+          value: {{ include "common.names.name" . }}
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              name: couchbase-secret
+              key: username
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              name: couchbase-secret
+              key: password
+        envFrom:
+        - secretRef:
+            name: {{ include "common.names.name" . }}-admin-secret
+
       - name: {{ include "common.names.name" . }}
         image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -74,4 +115,3 @@ spec:
       {{- end }}
       {{- end }}
 
-      restartPolicy: Always
