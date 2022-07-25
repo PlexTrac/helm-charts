@@ -1,0 +1,80 @@
+{{- include "context.core-backend" . }}
+{{- with .Contexts.coreBackend }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrations
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  parallelism: 1
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 60
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: disabled
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: {{ include "common.names.name" . }}
+        image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+        - npm run maintenance:enable &&
+          npm run db:migrate &&
+          npm run maintenance:disable
+        env:
+        - name: CB_API_USER
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbaseUsername"
+                "secret" (default "couchbase-secret" .Values.couchbaseExistingSecret)
+                "secretKey" (printf "%s%s" (default "" .Values.couchbaseExistingSecretKeyPrefix) "username")
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: CB_API_PASS
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbasePassword"
+                "secret" (default "couchbase-secret" .Values.couchbaseExistingSecret)
+                "secretKey" (printf "%s%s" (default "" .Values.couchbaseExistingSecretKeyPrefix) "password")
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: CB_ADMIN_USER
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbaseAdminUsername"
+                "secret" (default "couchbase-admin-secret" .Values.couchbaseExistingSecret)
+                "secretKey" "CB_ADMIN_USER"
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: CB_ADMIN_PASS
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "couchbaseAdminPassword"
+                "secret" (default "couchbase-admin-secret" .Values.couchbaseExistingSecret)
+                "secretKey" "CB_ADMIN_PASS"
+                "rootContext" . 
+          ) | nindent 10 }}
+        - name: COUCHBASE_URL
+          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "couchbase") $) }}
+        - name: REDIS_CONNECTION_STRING
+          value: {{ include "common.names.dependencyName" (merge (dict "dependency" "redis") $) }}
+        - name: REDIS_PASSWORD
+          {{- include "common.secret.fromValueOrSecret" (
+                dict
+                "key" "password"
+                "secret" (default "redis-secret" .Values.redisExistingSecret)
+                "secretKey" (default "password" .Values.redisExistingSecretKey)
+                "rootContext" . 
+          ) | nindent 10 }}
+
+      {{- include "common.images.pullSecrets" $ | nindent 6 }}
+ 
+{{- end }}

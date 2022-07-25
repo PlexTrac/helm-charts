@@ -32,12 +32,18 @@ spec:
             bucketReady=`curl -s --head -X GET -u "$CB_ADMIN_USER":"$CB_ADMIN_PASS" -H "Content-Type: application/json" $COUCHBASE:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
             if [ $bucketReady -eq 1 ]; then break; else sleep 5; fi
           done
+
           echo "$COUCHBASE:8091 is ready, checking for app user"
           userExists=`curl -s --head -X GET -u $CB_API_USER:$CB_API_PASS -H "Content-Type: application/json" $COUCHBASE:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
-          if [ $userExists -eq 1 ]; then echo "App user exists, nothing to do"; exit 0; fi
-          echo "Setting up app user"
-          couchbase-cli user-manage --set -c $COUCHBASE:8091 -u $CB_ADMIN_USER -p $CB_ADMIN_PASS --rbac-username $CB_API_USER --rbac-password $CB_API_PASS --rbac-name "PlexTrac API User" --roles bucket_full_access[reportMe] --auth-domain local
-          echo "Users initialization complete"
+          if [ $userExists -eq 1 ]; then
+            echo "App user exists, nothing to do"
+          else
+            echo "Setting up app user"
+            couchbase-cli user-manage --set -c $COUCHBASE:8091 -u $CB_ADMIN_USER -p $CB_ADMIN_PASS --rbac-username $CB_API_USER --rbac-password $CB_API_PASS --rbac-name "PlexTrac API User" --roles bucket_full_access[reportMe] --auth-domain local
+            echo "Users initialization complete"
+          fi
+
+          # Long loop to avoid closing this container
           while true; do
             sleep 600
             echo "Sidecar sleeping..."
