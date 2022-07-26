@@ -7,7 +7,7 @@ icon: https://plextrac.com/wp-content/uploads/2021/10/cropped-PlexTrac-Symbol-Sm
 type: application
 
 # Represents the chart revision
-version: 0.3.1
+version: 0.3.2
 
 # Uses the "stable" tag for PlexTrac images
 appVersion: "stable"
