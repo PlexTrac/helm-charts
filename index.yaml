@@ -2,6 +2,24 @@ apiVersion: v1
 entries:
   common:
   - apiVersion: v2
+    created: "2022-07-26T17:30:08.876939587Z"
+    description: Library for PlexTrac Charts
+    digest: 40264bbecdf4093205a53df922c17a428b053248b71052034a7f22386ac9d0f3
+    keywords:
+    - common
+    - plextrac
+    kubeVersion: '>=1.19'
+    maintainers:
+    - email: jesse@plextrac.com
+      name: Jesse Roberts
+    - email: devops@plextrac.com
+      name: PlexTrac DevOps Team
+    name: common
+    type: library
+    urls:
+    - https://github.com/PlexTrac/helm-charts/releases/download/common-0.1.2/common-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v2
     created: "2022-05-23T23:12:21.627435927Z"
     description: Library for PlexTrac Charts
     digest: 785a69f15d14b756fb327314419007fac236eff6b070036c3341daaeceb7af29
@@ -227,4 +245,4 @@ entries:
     urls:
     - https://github.com/PlexTrac/helm-charts/releases/download/redis-0.1.0/redis-0.1.0.tgz
     version: 0.1.0
-generated: "2022-07-26T15:54:06.839917215Z"
+generated: "2022-07-26T17:30:08.876967189Z"
