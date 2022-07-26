@@ -25,8 +25,6 @@ spec:
         {{- include "common.labels" . | nindent 8 }}
     spec:
       containers:
-        # TODO: add init container that can bootstrap the DB if necessary (for
-        # demo, single node, etc)
       - name: {{ include "common.names.name" . }}
         image: {{ include "common.images.image" (dict "local" .Values.image "global" $) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -41,6 +39,12 @@ spec:
         {{- end }}
         - name: CLIENT_DOMAIN_NAME
           value: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
+        {{- with .Values.extraEnvVars }}
+        {{- range $k, $v := . }}
+        - name: {{ $k }}
+          value: {{ $v | quote }}
+        {{- end }}
+        {{- end }}
         ports:
         - name: https
           containerPort: 443

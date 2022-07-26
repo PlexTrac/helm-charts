@@ -36,6 +36,8 @@ ingress:
   annotations: {}
   # -- Define the host used in the Ingress
   host: plextrac.local
+  # -- Define the backend port to use
+  servicePort: https
 
 
 core-backend:
@@ -116,6 +118,12 @@ core-frontend: # This loads the PlexTrac UI locally vs from a CDN
   service:
     type: ClusterIP
     port: 8443  # the current container enforces HTTPS
+
+event-notifications:
+  enabled: false
+
+event-engine:
+  enabled: false
 
 # -- Configuration for the redis sub-chart
 redis:
