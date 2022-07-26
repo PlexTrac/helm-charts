@@ -36,7 +36,7 @@ imagePullSecrets:
   {{- toYaml . | nindent 2 }}
   {{- end -}}
   {{- range $managedSecrets }}
-  - name: {{ printf "%s-%s-secret" (.registry | replace "." "-") .username }}
+  - name: {{ printf "%s-%s-secret" (.registry | replace "." "-") .username | replace "_" "-" }}
   {{- end }}
 
 {{- end }}
