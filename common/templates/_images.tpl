@@ -50,7 +50,7 @@ imagePullSecrets:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ printf "%s-%s-secret" (.registry | replace "." "-") .username }}
+  name: {{ printf "%s-%s-secret" (.registry | replace "." "-") .username | replace "_" "-" }}
   labels:
     {{- include "common.labels" $rootContext | nindent 4 }}
 type: kubernetes.io/dockerconfigjson
