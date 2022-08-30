@@ -13,7 +13,7 @@ spec:
   ingressClassName: {{ . }}
   {{- end }}
   rules:
-  - host: {{ include "legacy.CLIENT_DOMAIN_NAME" $ }}
+  - host: {{ include "legacy.CLIENT_DOMAIN_NAME" $ | quote }}
     http:
       paths:
       - path: /
@@ -23,3 +23,8 @@ spec:
             name: {{ include "common.names.dependencyName" (merge (dict "dependency" "core-frontend") $) }}
             port:
               name: {{ .Values.ingress.servicePort }}
+  tls:
+  - hosts:
+    - {{ include "legacy.CLIENT_DOMAIN_NAME" $ | quote }}
+    secretName: {{ printf "%s-tls" (include "legacy.CLIENT_DOMAIN_NAME" $) }}
+
