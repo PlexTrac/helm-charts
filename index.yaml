@@ -107,6 +107,30 @@ entries:
   plextrac:
   - apiVersion: v2
     appVersion: stable
+    created: "2022-08-30T03:21:56.773823507Z"
+    dependencies:
+    - name: common
+      repository: file://../common
+      version: ~0.1
+    - condition: couchbase.enabled
+      name: couchbase
+      repository: file://../couchbase
+      version: ~0.1
+    - condition: redis.enabled
+      name: redis
+      repository: file://../redis
+      version: ~0.1
+    description: Deploys the PlexTrac application & any required dependencies
+    digest: a335cd73f9a5e1104ea5e0d72a200f4c3a7cf1e5e7ce2d66387d576c191d50fd
+    home: https://github.com/PlexTrac/helm-charts
+    icon: https://plextrac.com/wp-content/uploads/2021/10/cropped-PlexTrac-Symbol-Small-Use-192x192.png
+    name: plextrac
+    type: application
+    urls:
+    - https://github.com/PlexTrac/helm-charts/releases/download/plextrac-0.3.4/plextrac-0.3.4.tgz
+    version: 0.3.4
+  - apiVersion: v2
+    appVersion: stable
     created: "2022-07-26T17:41:24.666020148Z"
     dependencies:
     - name: common
@@ -311,4 +335,4 @@ entries:
     urls:
     - https://github.com/PlexTrac/helm-charts/releases/download/redis-0.1.0/redis-0.1.0.tgz
     version: 0.1.0
-generated: "2022-07-26T17:41:24.66608215Z"
+generated: "2022-08-30T03:21:56.773872407Z"
