@@ -16,7 +16,7 @@ spec:
   - host: {{ include "legacy.CLIENT_DOMAIN_NAME" $ | quote }}
     http:
       paths:
-      - path: /
+      - path: {{ default "/" .Values.ingress.path }}
         pathType: ImplementationSpecific
         backend:
           service:
