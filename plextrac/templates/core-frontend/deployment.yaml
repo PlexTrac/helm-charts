@@ -33,6 +33,8 @@ spec:
           {{ toYaml . | nindent 10 }}
         {{- end }}
         env:
+        - name: API_FQDN
+          value: core-backend.{{ .Release.Namespace }}.svc.cluster.local
         {{- with .Values.sentryDSN }}
         - name: SENTRY_DSN_FRONTEND
           value: {{ . | quote}}
