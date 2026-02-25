@@ -1,17 +1,37 @@
 {{- if and (eq .Values.secrets.mode "manual") .Values.secrets.manual.createKubernetesSecrets }}
 {{- $namespace := include "plextrac.namespace" . }}
-{{- $appStringData := default (dict) .Values.secrets.manual.generatedSecrets.application.stringData }}
-{{- $appData := default (dict) .Values.secrets.manual.generatedSecrets.application.data }}
-{{- $sharedStringData := default (dict) .Values.secrets.manual.generatedSecrets.shared.stringData }}
-{{- $sharedData := default (dict) .Values.secrets.manual.generatedSecrets.shared.data }}
+{{- $appSecretName := default "application-secrets" .Values.secrets.manual.generatedSecrets.application.name }}
+{{- $sharedSecretName := default "shared-secrets" .Values.secrets.manual.generatedSecrets.shared.name }}
+{{- $appStringData := merge (dict) (default (dict) .Values.secrets.manual.generatedSecrets.application.stringData) }}
+{{- $appData := merge (dict) (default (dict) .Values.secrets.manual.generatedSecrets.application.data) }}
+{{- $sharedStringData := merge (dict) (default (dict) .Values.secrets.manual.generatedSecrets.shared.stringData) }}
+{{- $sharedData := merge (dict) (default (dict) .Values.secrets.manual.generatedSecrets.shared.data) }}
+{{- $existingAppSecret := lookup "v1" "Secret" $namespace $appSecretName }}
+{{- $existingSharedSecret := lookup "v1" "Secret" $namespace $sharedSecretName }}
+{{- $existingAppData := dict }}
+{{- $existingSharedData := dict }}
+{{- if and $existingAppSecret $existingAppSecret.data }}
+{{- $existingAppData = $existingAppSecret.data }}
+{{- end }}
+{{- if and $existingSharedSecret $existingSharedSecret.data }}
+{{- $existingSharedData = $existingSharedSecret.data }}
+{{- end }}
 {{- range $idx, $key := .Values.secrets.manual.requiredKeys.application }}
 {{- if not (or (hasKey $appStringData $key) (hasKey $appData $key)) }}
-{{- fail (printf "Missing required application secret key for manual mode: %s (set secrets.manual.generatedSecrets.application.stringData.%s or .data.%s)" $key $key $key) }}
+{{- if hasKey $existingAppData $key }}
+{{- $_ := set $appData $key (get $existingAppData $key) }}
+{{- else }}
+{{- $_ := set $appStringData $key (include "plextrac.manualSecretDefaultValue" (dict "key" $key)) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- range $idx, $key := .Values.secrets.manual.requiredKeys.shared }}
 {{- if not (or (hasKey $sharedStringData $key) (hasKey $sharedData $key)) }}
-{{- fail (printf "Missing required shared secret key for manual mode: %s (set secrets.manual.generatedSecrets.shared.stringData.%s or .data.%s)" $key $key $key) }}
+{{- if hasKey $existingSharedData $key }}
+{{- $_ := set $sharedData $key (get $existingSharedData $key) }}
+{{- else }}
+{{- $_ := set $sharedStringData $key (include "plextrac.manualSecretDefaultValue" (dict "key" $key)) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if not .Values.secrets.manual.generatedSecrets.registryCredentials.enabled }}
@@ -20,7 +40,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "application-secrets" .Values.secrets.manual.generatedSecrets.application.name }}
+  name: {{ $appSecretName }}
   namespace: {{ $namespace }}
 type: Opaque
 {{- with $appData }}
@@ -35,7 +55,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "shared-secrets" .Values.secrets.manual.generatedSecrets.shared.name }}
+  name: {{ $sharedSecretName }}
   namespace: {{ $namespace }}
 type: Opaque
 {{- with $sharedData }}
@@ -55,7 +75,7 @@ metadata:
   namespace: {{ $namespace }}
 type: kubernetes.io/dockerconfigjson
 stringData:
-  .dockerconfigjson: {{ required "secrets.manual.generatedSecrets.registryCredentials.dockerconfigjson is required when registryCredentials.enabled=true" .Values.secrets.manual.generatedSecrets.registryCredentials.dockerconfigjson | quote }}
+  .dockerconfigjson: {{ default "{}" .Values.secrets.manual.generatedSecrets.registryCredentials.dockerconfigjson | quote }}
 {{- end }}
 {{- if .Values.secrets.manual.generatedSecrets.tls.enabled }}
 ---

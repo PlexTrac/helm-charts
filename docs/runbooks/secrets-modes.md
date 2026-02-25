@@ -175,7 +175,7 @@ Security note:
 
 - Values files contain sensitive material in this mode. Prefer encrypted values tooling (for example SOPS) in GitOps workflows.
 - You can create any extra secret object per deployment with `generatedSecrets.additional` (custom `name`, `type`, `stringData`, and/or base64 `data`).
-- In manual auto-create mode, this chart validates required GA secret keys and fails Helm rendering if any required keys are missing.
+- In manual auto-create mode, this chart auto-populates missing GA required keys (or reuses existing secret values when present).
 - In manual auto-create mode, this chart also requires `generatedSecrets.registryCredentials.enabled=true` because GA templates reference `regcred-dorf` for image pulls.
 
 ## Verify after install

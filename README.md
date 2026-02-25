@@ -32,6 +32,8 @@ Set `secrets.mode` in values:
 - `csi`: creates `SecretProviderClass` for CSI-based providers
 - `manual`: either references pre-existing Kubernetes Secrets or auto-creates required GA Kubernetes Secrets when `secrets.manual.createKubernetesSecrets=true`
 
+In `manual` auto-create mode, missing GA-required secret keys are generated automatically (or reused from existing in-cluster secret values).
+
 Detailed usage by mode: `docs/runbooks/secrets-modes.md`.
 
 Ingress host and TLS secret are configured via:
