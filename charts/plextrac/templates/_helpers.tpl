@@ -31,3 +31,16 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- fail "values.secrets.mode must be one of: externalSecrets, csi, manual" -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "plextrac.manualSecretDefaultValue" -}}
+{{- $key := .key -}}
+{{- if eq $key "ADMIN_EMAIL" -}}
+{{- "" -}}
+{{- else if eq $key "API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE" -}}
+{{- "{}" -}}
+{{- else if eq $key "pt-load-bq-sa-svc-acct-creds.json" -}}
+{{- "{}" -}}
+{{- else -}}
+{{- randAlphaNum 40 -}}
+{{- end -}}
+{{- end -}}
