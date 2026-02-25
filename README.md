@@ -30,7 +30,7 @@ Set `secrets.mode` in values:
 
 - `externalSecrets` (default GA path): creates `ExternalSecret` resources
 - `csi`: creates `SecretProviderClass` for CSI-based providers
-- `manual`: references pre-existing Kubernetes Secrets
+- `manual`: either references pre-existing Kubernetes Secrets or auto-creates required GA Kubernetes Secrets when `secrets.manual.createKubernetesSecrets=true`
 
 Detailed usage by mode: `docs/runbooks/secrets-modes.md`.
 

@@ -12,4 +12,4 @@ Set chart values per component image tag and promote by updating the GA profile 
 
 - `secrets.mode=externalSecrets`: External Secrets Operator
 - `secrets.mode=csi`: Secrets Store CSI Driver
-- `secrets.mode=manual`: pre-created Kubernetes Secrets
+- `secrets.mode=manual`: pre-created Kubernetes Secrets or chart-managed auto-generated Kubernetes Secrets via `secrets.manual.createKubernetesSecrets=true`
