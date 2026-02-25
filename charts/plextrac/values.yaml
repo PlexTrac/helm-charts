@@ -90,7 +90,6 @@ secrets:
         - CKEDITOR_SERVER_LICENSE_KEY
         - LAUNCH_DARKLY_SDK_KEY
         - PENDO_API_KEY
-        - PLEXAI_ASKAI_GEMINI_API_KEY
         - SENTRY_DSN_BACKEND
         - pt-load-bq-sa-svc-acct-creds.json
     generatedSecrets:

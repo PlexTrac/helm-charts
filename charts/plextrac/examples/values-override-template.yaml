@@ -65,7 +65,9 @@
 #         data: {}
 #       shared:
 #         name: shared-secrets
-#         stringData: {}
+#         stringData:
+#           # Required when CKEditor services are enabled.
+#           CKEDITOR_SERVER_LICENSE_KEY: ""
 #         data: {}
 #       registryCredentials:
 #         enabled: true

@@ -33,6 +33,7 @@ Set `secrets.mode` in values:
 - `manual`: either references pre-existing Kubernetes Secrets or auto-creates required GA Kubernetes Secrets when `secrets.manual.createKubernetesSecrets=true`
 
 In `manual` auto-create mode, missing GA-required secret keys are generated automatically (or reused from existing in-cluster secret values).
+If you use CKEditor, set `secrets.manual.generatedSecrets.shared.stringData.CKEDITOR_SERVER_LICENSE_KEY`.
 
 Detailed usage by mode: `docs/runbooks/secrets-modes.md`.
 

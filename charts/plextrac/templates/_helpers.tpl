@@ -36,6 +36,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- $key := .key -}}
 {{- if eq $key "ADMIN_EMAIL" -}}
 {{- "" -}}
+{{- else if eq $key "CKEDITOR_SERVER_LICENSE_KEY" -}}
+{{- "" -}}
 {{- else if eq $key "API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE" -}}
 {{- "{}" -}}
 {{- else if eq $key "pt-load-bq-sa-svc-acct-creds.json" -}}
