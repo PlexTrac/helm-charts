@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/instance: plextracdb
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: plextracdb
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: plextracdb
+    serviceName: couchbase
+  name: plextracdb
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: plextracdb
+  serviceName: plextracdb
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: plextracdb
+        app.kubernetes.io/component: database
+        app.kubernetes.io/instance: plextracdb
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: plextracdb
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        serviceName: couchbase
+    spec:
+      containers:
+      - env:
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CB_ADMIN_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_ADMIN_PASS
+              name: application-secrets
+        - name: CB_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_ADMIN_USER
+              name: application-secrets
+        image: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracdb:7.2.0
+        imagePullPolicy: Always
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                while true; do
+                  echo "Connecting to localhost:8091 to see if it's initialized"
+                  bucketReady=`curl -s --head -X GET -u "$CB_ADMIN_USER":"$CB_ADMIN_PASS" -H "Content-Type: application/json" localhost:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
+                  if [ $bucketReady -eq 1 ]; then break; else sleep 5; fi
+                done
+                echo "localhost:8091 is ready, checking for app user"
+                userExists=`curl -s --head -X GET -u $CB_API_USER:$CB_API_PASS -H "Content-Type: application/json" localhost:8091/pools/default/buckets/reportMe | head -n 1 | grep -c "200 OK"`
+                if [ $userExists -eq 1 ]; then
+                  echo "App user exists, nothing to do"
+                  exit 0
+                fi
+                echo "Setting up app user"
+                couchbase-cli user-manage --set -c localhost:8091 -u $CB_ADMIN_USER -p $CB_ADMIN_PASS --rbac-username $CB_API_USER --rbac-password $CB_API_PASS --rbac-name "PlexTrac API User" --roles bucket_full_access[reportMe] --auth-domain local
+                echo "Users initialization complete"
+                exit 0
+        livenessProbe:
+          initialDelaySeconds: 30
+          tcpSocket:
+            port: 8091
+          timeoutSeconds: 1
+        name: plextracdb
+        ports:
+        - containerPort: 8091
+          name: rest-port
+        - containerPort: 8092
+          name: capi-port
+        - containerPort: 8093
+          name: query-port
+        - containerPort: 8094
+          name: fts-http-port
+        - containerPort: 11210
+          name: memcached-port
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 6.5Gi
+          requests:
+            cpu: 100m
+            memory: 1250Mi
+        volumeMounts:
+        - mountPath: /opt/couchbase/var
+          name: plextracdb-vol
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Always
+      volumes:
+      - name: plextracdb-vol
+        persistentVolumeClaim:
+          claimName: plextracdb-pvc

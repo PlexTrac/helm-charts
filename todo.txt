@@ -1,8 +1,0 @@
-Support common secret management tools eg via annotations
-Integrate into central docs repo
-Use minio to as a mini-CDN
-Handle releasing charts via 'https://github.com/k8s-at-home/library-charts/blob/main/.github/workflows/charts-release.yaml'
-Reference gitlab helm info on secrets, etc 'https://docs.gitlab.com/charts/installation/secrets.html\#redis-password'
-ref gitlab job for tasks that need to happen like creating buckets, running migrations, etc 'https://gitlab.com/gitlab-org/charts/gitlab/-/blob/master/charts/minio/templates/create-buckets-job.yaml'
-convert redis to use a statefulset allowing single node or HA mode
-support directly passing locale overrides

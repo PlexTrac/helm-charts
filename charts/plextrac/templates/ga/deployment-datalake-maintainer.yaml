@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: datalake-maintainer
+    app.kubernetes.io/instance: datalake-maintainer
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: datalake-maintainer
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: datalake-maintainer
+  name: datalake-maintainer
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: datalake-maintainer
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: datalake-maintainer
+        app.kubernetes.io/component: datalake-maintainer
+        app.kubernetes.io/instance: datalake-maintainer
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: datalake-maintainer
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - args:
+        - run
+        - start:datalake-maintainer
+        command:
+        - npm
+        env:
+        - name: CLIENT_DOMAIN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: CLIENT_DOMAIN_NAME
+              name: env-config
+        - name: DATALAKE_ETL
+          valueFrom:
+            configMapKeyRef:
+              key: DATALAKE_ETL
+              name: env-config
+        - name: DL_BUCKET_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: DL_BUCKET_NAME
+              name: env-config
+        - name: DL_DATASET_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: DL_DATASET_NAME
+              name: env-config
+        - name: DL_GCP_PROJECT
+          valueFrom:
+            configMapKeyRef:
+              key: DL_GCP_PROJECT
+              name: env-config
+        - name: DL_GCP_REGION
+          valueFrom:
+            configMapKeyRef:
+              key: DL_GCP_REGION
+              name: env-config
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          valueFrom:
+            configMapKeyRef:
+              key: DL_GCP_DATALAKE_SA_KEY_PATH
+              name: env-config
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              key: LOG_FORMAT
+              name: env-config
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              key: LOG_LEVEL
+              name: env-config
+        - name: LOG_SERVICE_NAME
+          value: datalake-maintainer
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              key: NODE_ENV
+              name: env-config
+        - name: PG_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: PG_HOST
+              name: env-config
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: REDIS_CONNECTION_STRING
+          valueFrom:
+            configMapKeyRef:
+              key: REDIS_CONNECTION_STRING
+              name: env-config
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              key: LAUNCH_DARKLY_SDK_KEY
+              name: shared-secrets
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 4351
+          timeoutSeconds: 1
+        name: datalake-maintainer
+        resources:
+          limits:
+            cpu: 250m
+            memory: 4Gi
+          requests:
+            cpu: 150m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /usr/src/plextrac-api/keys/gcp
+          name: pt-load-bq-creds-json-volume
+          readOnly: true
+      imagePullSecrets:
+      - name: regcred-dorf
+      initContainers:
+      - args:
+        - -c
+        - |
+          gcloud auth activate-service-account --key-file=/var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
+        command:
+        - /bin/sh
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
+        - name: CLOUDSDK_CONFIG
+          value: /tmp/gcloud
+        image: google/cloud-sdk:530.0.0-alpine
+        name: perform-gcloud-auth
+        volumeMounts:
+        - mountPath: /var/secrets/gcp
+          name: pt-load-bq-creds-json-volume
+          readOnly: true
+      volumes:
+      - name: pt-load-bq-creds-json-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: pt-load-bq-sa-svc-acct-creds.json
+            path: pt-load-bq-sa-svc-acct-creds.json
+          secretName: shared-secrets

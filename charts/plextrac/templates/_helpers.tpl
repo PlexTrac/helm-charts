@@ -1,0 +1,25 @@
+{{- define "plextrac.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "plextrac.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "plextrac.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{- define "plextrac.commonLabels" -}}
+{{ include "plextrac.selectorLabels" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: plextrac
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+{{- end -}}
+
+{{- define "plextrac.namespace" -}}
+{{- default .Release.Namespace .Values.global.namespace -}}
+{{- end -}}
+
+{{- define "plextrac.validateSecretMode" -}}
+{{- if not (has .Values.secrets.mode (list "externalSecrets" "csi" "manual")) -}}
+{{- fail "values.secrets.mode must be one of: externalSecrets, csi, manual" -}}
+{{- end -}}
+{{- end -}}

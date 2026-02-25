@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "createNamespace": { "type": "boolean" }
+      },
+      "required": ["namespace"]
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["externalSecrets", "csi", "manual"]
+        },
+        "externalSecrets": {
+          "type": "object",
+          "properties": {
+            "refreshInterval": { "type": "string" },
+            "secretStoreRef": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string" },
+                "name": { "type": "string" }
+              },
+              "required": ["kind", "name"]
+            },
+            "application": {
+              "type": "object",
+              "properties": {
+                "targetSecretName": { "type": "string" },
+                "remoteKey": { "type": "string" }
+              },
+              "required": ["targetSecretName", "remoteKey"]
+            },
+            "shared": {
+              "type": "object",
+              "properties": {
+                "targetSecretName": { "type": "string" },
+                "remoteKey": { "type": "string" },
+                "commonProperty": { "type": "string" },
+                "stageProperty": { "type": "string" }
+              },
+              "required": ["targetSecretName", "remoteKey", "commonProperty", "stageProperty"]
+            },
+            "registryCredentials": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "targetSecretName": { "type": "string" },
+                "remoteKey": { "type": "string" }
+              },
+              "required": ["enabled", "targetSecretName", "remoteKey"]
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "targetSecretName": { "type": "string" },
+                "remoteKey": { "type": "string" }
+              },
+              "required": ["enabled", "targetSecretName", "remoteKey"]
+            }
+          },
+          "required": ["refreshInterval", "secretStoreRef", "application", "shared", "registryCredentials", "tls"]
+        },
+        "csi": {
+          "type": "object",
+          "properties": {
+            "secretProviderClass": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "name": { "type": "string" },
+                "provider": { "type": "string" },
+                "parameters": { "type": "object" },
+                "secretObjects": { "type": "array" }
+              },
+              "required": ["enabled", "name", "provider"]
+            }
+          }
+        }
+      },
+      "required": ["mode"]
+    },
+    "images": {
+      "type": "object",
+      "required": [
+        "backend",
+        "nginx",
+        "ruxpin",
+        "ckeditor",
+        "postgres",
+        "redis",
+        "redisExporter",
+        "minioBootstrap",
+        "minio"
+      ],
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "repository": { "type": "string", "minLength": 1 },
+          "tag": { "type": "string", "minLength": 1 }
+        },
+        "required": ["repository", "tag"]
+      }
+    }
+  },
+  "required": ["global", "secrets", "images"]
+}

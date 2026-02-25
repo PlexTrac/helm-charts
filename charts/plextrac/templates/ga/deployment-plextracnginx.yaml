@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: core-frontend
+    app.kubernetes.io/instance: plextracnginx
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: plextracnginx
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: plextracnginx
+  name: plextracnginx
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: plextracnginx
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: plextracnginx
+        app.kubernetes.io/component: core-frontend
+        app.kubernetes.io/instance: plextracnginx
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: plextracnginx
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - env:
+        - name: API_FQDN
+          value: plextracapi.plextrac.svc.cluster.local
+        - name: CLIENT_DOMAIN_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: CLIENT_DOMAIN_NAME
+              name: env-config
+        - name: UPSTREAM_CLOUD_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              key: UPSTREAM_CLOUD_BUCKET
+              name: env-config
+        - name: UPSTREAM_CLOUD_PREFIX
+          valueFrom:
+            configMapKeyRef:
+              key: UPSTREAM_CLOUD_PREFIX
+              name: env-config
+        - name: MINIO_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              key: MINIO_ENABLED
+              name: env-config
+        - name: UPSTREAM_CLOUD_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: UPSTREAM_CLOUD_HOST
+              name: env-config
+        - name: ENFORCE_TLS_REDIRECT
+          value: "false"
+        - name: WAF_ENABLED
+          value: "false"
+        image: {{ .Values.images.nginx.repository }}:{{ .Values.images.nginx.tag }}
+        imagePullPolicy: Always
+        name: plextracnginx
+        ports:
+        - containerPort: 80
+          name: nginx-80
+        - containerPort: 443
+          name: nginx-443
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          tcpSocket:
+            port: 80
+        resources:
+          limits:
+            cpu: 100m
+            memory: 150Mi
+          requests:
+            cpu: 3m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: nginx-config-data
+      imagePullSecrets:
+      - name: regcred-dorf
+      initContainers:
+      - args:
+        - set -x; cp -R /etc/nginx/conf.d/ volumes/nginx/ && cp /volumes/waf_rules/customer_curated.rules
+          /volumes/nginx/conf.d/customer_curated.rules && echo '##' > /volumes/nginx/conf.d/naxsi_core.rules
+          && stat /volumes/nginx/conf.d/naxsi_core.rules
+        command:
+        - sh
+        - -c
+        image: {{ .Values.images.nginx.repository }}:{{ .Values.images.nginx.tag }}
+        imagePullPolicy: Always
+        name: init-plextracnginx-customer-waf-rules
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /volumes/nginx/conf.d
+          name: nginx-config-data
+        - mountPath: /volumes/waf_rules/
+          name: customer-curated-waf-rules
+      restartPolicy: Always
+      volumes:
+      - configMap:
+          name: customer-curated-waf-rules
+        name: customer-curated-waf-rules
+      - name: nginx-config-data
+        persistentVolumeClaim:
+          claimName: nginx-config-pvc

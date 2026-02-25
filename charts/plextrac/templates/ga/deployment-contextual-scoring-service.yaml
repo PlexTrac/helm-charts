@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: contextual-scoring
+    app.kubernetes.io/instance: contextual-scoring
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: contextual-scoring
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: contextual-scoring-service
+  name: contextual-scoring-service
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: contextual-scoring-service
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: contextual-scoring-service
+        app.kubernetes.io/component: contextual-scoring
+        app.kubernetes.io/instance: contextual-scoring
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: contextual-scoring
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        name: contextual-scoring-service
+    spec:
+      containers:
+      - args:
+        - run
+        - start:contextual-scoring-service
+        command:
+        - npm
+        env:
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        name: contextual-scoring-service
+        ports:
+        - containerPort: 4352
+          name: cs-port
+        readinessProbe:
+          exec:
+            command:
+            - npm
+            - run
+            - healthcheck:contextual-scoring-service
+            - liveness
+            - --
+            - --no-update-notifier
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+        resources:
+          limits:
+            cpu: 800m
+            memory: 2Gi
+          requests:
+            cpu: 250m
+            memory: 100Mi
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Always

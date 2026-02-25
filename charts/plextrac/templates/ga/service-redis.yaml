@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+    name: redis
+  name: redis
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ports:
+  - name: redis-port
+    port: 6379
+    targetPort: redis-port
+  selector:
+    name: redis

@@ -1,0 +1,63 @@
+global:
+  namespace: plextrac
+  createNamespace: true
+
+secrets:
+  mode: externalSecrets
+  externalSecrets:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: gcp-cluster-secret-store
+    application:
+      targetSecretName: application-secrets
+      remoteKey: placeholder_gcp_secret_name
+    shared:
+      targetSecretName: shared-secrets
+      remoteKey: plextrac-shared-secrets
+      commonProperty: allstages
+      stageProperty: ga
+    registryCredentials:
+      enabled: true
+      targetSecretName: regcred-dorf
+      remoteKey: regcred-dorf
+    tls:
+      enabled: true
+      targetSecretName: plextrac-com-tls
+      remoteKey: plextrac-com-tls
+  csi:
+    secretProviderClass:
+      enabled: false
+      name: plextrac-secrets-provider
+      provider: gcp
+      parameters: {}
+      secretObjects: []
+
+images:
+  backend:
+    repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
+    tag: 2.27.4
+  nginx:
+    repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
+    tag: 2.27.4
+  ruxpin:
+    repository: registry.dorf.plextrac.ninja/cicd-app-images/ruxpin
+    tag: 2.18.2
+  ckeditor:
+    repository: registry.dorf.plextrac.ninja/ckeditor-registry-proxy/cs
+    tag: 4.25.0
+  postgres:
+    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracpostgres
+    tag: stable
+  redis:
+    repository: redis
+    tag: 8.4.0-alpine
+  redisExporter:
+    repository: oliver006/redis_exporter
+    tag: latest
+  minioBootstrap:
+    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextrac-minio-bootstrap
+    tag: stable
+  minio:
+    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/minio
+    tag: latest

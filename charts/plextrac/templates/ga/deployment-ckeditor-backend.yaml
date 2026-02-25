@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ckeditor-backend
+    app.kubernetes.io/component: ckeditor
+    app.kubernetes.io/instance: ckeditor-backend
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: ckeditor-backend
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: ckeditor-backend
+    serviceName: ckeditor-backend-svc
+  name: ckeditor-backend
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ckeditor-backend
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 2
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: ckeditor-backend
+        app.kubernetes.io/component: ckeditor
+        app.kubernetes.io/instance: ckeditor-backend
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: ckeditor-backend
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        name: ckeditor-backend
+        serviceName: ckeditor-backend-svc
+    spec:
+      containers:
+      - env:
+        - name: DATABASE_DRIVER
+          value: postgres
+        - name: DATABASE_DATABASE
+          value: ckeditor
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: PG_HOST
+              name: env-config
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: DATABASE_SCHEMA
+          value: public
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_ADMIN_USER
+              name: application-secrets
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_ADMIN_PASSWORD
+              name: application-secrets
+        - name: REDIS_HOST
+          value: redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: ENVIRONMENTS_MANAGEMENT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CKEDITOR_ENVIRONMENT_SECRET_KEY
+              name: application-secrets
+        - name: LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CKEDITOR_SERVER_LICENSE_KEY
+              name: shared-secrets
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              key: CKEDITOR_LOG_LEVEL
+              name: env-config
+        - name: ENABLE_METRIC_LOGS
+          valueFrom:
+            configMapKeyRef:
+              key: CKEDITOR_ENABLE_METRIC_LOGS
+              name: env-config
+        image: {{ .Values.images.ckeditor.repository }}:{{ .Values.images.ckeditor.tag }}
+        imagePullPolicy: Always
+        name: ckeditor-backend
+        ports:
+        - containerPort: 8000
+          name: ckeditor-port
+        resources:
+          limits:
+            memory: 2048Mi
+          requests:
+            cpu: 100m
+            memory: 300Mi
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Always
+      volumes:
+      - name: plextracapi-vol
+        persistentVolumeClaim:
+          claimName: plextracapi-pvc
