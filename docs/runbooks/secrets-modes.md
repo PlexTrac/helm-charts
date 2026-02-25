@@ -1,20 +1,33 @@
-# Secrets Modes Usage Guide
+# Secrets Setup by Mode
 
-This chart supports three secret wiring modes through `secrets.mode`:
+Use this guide to configure secrets for the `plextrac` chart across all supported `secrets.mode` values:
 
-- `externalSecrets` (GA default)
+- `externalSecrets` (default)
 - `csi`
 - `manual`
 
-Use this guide to choose and apply the correct mode.
+## Secret types this chart expects
+
+Regardless of mode, GA workloads expect these Kubernetes Secrets by name:
+
+- `application-secrets` (`Opaque`)
+- `shared-secrets` (`Opaque`)
+- `regcred-dorf` (`kubernetes.io/dockerconfigjson`) for image pulls
+- `plextrac-com-tls` (`kubernetes.io/tls`) when ingress TLS is enabled
+
+Notes:
+
+- Most workloads reference `application-secrets` and `shared-secrets` via `secretKeyRef`.
+- Image pull secrets are hardcoded to `regcred-dorf` in GA templates.
+- TLS is represented as an `ExternalSecret` in `externalSecrets` mode, or a pre-created TLS secret in `manual`/CSI-backed setups.
 
 ## Common prerequisites
 
-- Kubernetes cluster with namespace access.
-- Helm 3 installed.
-- Chart path: `./charts/plextrac`.
+- Kubernetes cluster access for target namespace
+- Helm 3
+- Chart path: `./charts/plextrac`
 
-For all modes, install with:
+Base install command:
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -23,25 +36,36 @@ helm upgrade --install plextrac ./charts/plextrac \
   -f <your-values-file>
 ```
 
-## Mode 1: externalSecrets (default GA path)
+## Mode 1: `externalSecrets`
 
-Use when External Secrets Operator is installed and a secret store is configured.
+Use when External Secrets Operator is installed and connected to a `SecretStore`/`ClusterSecretStore`.
 
-Example values file:
+Reference values file:
 
 - `charts/plextrac/examples/values-ga.yaml`
 
-Key fields:
+Required values:
 
+- `secrets.mode=externalSecrets`
 - `secrets.externalSecrets.secretStoreRef.kind`
 - `secrets.externalSecrets.secretStoreRef.name`
 - `secrets.externalSecrets.application.remoteKey`
 - `secrets.externalSecrets.shared.remoteKey`
-- `secrets.externalSecrets.shared.stageProperty` (set to `ga` for GA)
-- `secrets.externalSecrets.registryCredentials.*`
-- `secrets.externalSecrets.tls.*`
+- `secrets.externalSecrets.shared.commonProperty`
+- `secrets.externalSecrets.shared.stageProperty` (for GA, typically `ga`)
 
-Example command:
+Optional generated secret types:
+
+- Registry secret:
+  - enable with `secrets.externalSecrets.registryCredentials.enabled=true`
+  - set `targetSecretName` (default `regcred-dorf`)
+  - set `remoteKey` containing Docker config JSON payload
+- TLS secret:
+  - enable with `secrets.externalSecrets.tls.enabled=true`
+  - set `targetSecretName` (default `plextrac-com-tls`)
+  - set `remoteKey` containing a PKCS#12 bundle (template converts to `tls.crt`/`tls.key`)
+
+Install example:
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -50,22 +74,29 @@ helm upgrade --install plextrac ./charts/plextrac \
   -f charts/plextrac/examples/values-ga.yaml
 ```
 
-## Mode 2: csi
+## Mode 2: `csi`
 
-Use when Secrets Store CSI Driver is installed and you want provider-native CSI mounts/sync.
+Use when Secrets Store CSI Driver is installed and your provider can sync to Kubernetes Secrets.
 
-Example values file:
+Reference values file:
 
 - `charts/plextrac/examples/values-csi-gcp.yaml`
 
-Key fields:
+Required values:
 
+- `secrets.mode=csi`
 - `secrets.csi.secretProviderClass.enabled=true`
 - `secrets.csi.secretProviderClass.provider`
 - `secrets.csi.secretProviderClass.parameters`
 - `secrets.csi.secretProviderClass.secretObjects`
 
-Example command:
+Important behavior:
+
+- In CSI mode, this chart renders `SecretProviderClass` only.
+- Workloads still read Kubernetes Secrets by name (`application-secrets`, `shared-secrets`, `regcred-dorf`, `plextrac-com-tls`).
+- Configure `secretObjects` so synced Kubernetes Secrets match expected names and key structure.
+
+Install example:
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -74,27 +105,28 @@ helm upgrade --install plextrac ./charts/plextrac \
   -f charts/plextrac/examples/values-csi-gcp.yaml
 ```
 
-Notes:
+## Mode 3: `manual`
 
-- In CSI mode, the chart renders `SecretProviderClass`.
-- Ensure your CSI configuration syncs/creates Kubernetes Secrets expected by GA workloads.
+Use when secrets are managed directly in Kubernetes instead of External Secrets.
 
-## Mode 3: manual
+Manual mode now supports two patterns:
 
-Use when you want to create Kubernetes Secrets yourself and have workloads consume them directly.
+1. pre-create secrets outside Helm, or
+2. have Helm create them from values (`manual.createKubernetesSecrets=true`).
 
-Example values file:
+Reference values file:
 
 - `charts/plextrac/examples/values-manual-secrets.yaml`
 
-GA parity manifests reference these secret names:
+### Option A: pre-create secrets (outside Helm)
 
-- `application-secrets`
-- `shared-secrets`
-- `regcred-dorf` (image pull secret where required)
-- `plextrac-com-tls` (for ingress TLS)
+Required setup:
 
-Create required secrets before Helm install. Example:
+1. Create `application-secrets` and `shared-secrets` with all keys required by GA workloads.
+2. Create image pull secret `regcred-dorf`.
+3. Create TLS secret `plextrac-com-tls` if ingress TLS is used.
+
+Example creation commands:
 
 ```bash
 kubectl -n plextrac create secret generic application-secrets --from-env-file=app.env
@@ -108,7 +140,7 @@ kubectl -n plextrac create secret tls plextrac-com-tls \
   --key=./tls.key
 ```
 
-Then install:
+Install example:
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -117,9 +149,32 @@ helm upgrade --install plextrac ./charts/plextrac \
   -f charts/plextrac/examples/values-manual-secrets.yaml
 ```
 
-## Quick verification
+### Option B: Helm creates Kubernetes Secret objects
 
-After install, verify secret wiring:
+Set:
+
+- `secrets.mode=manual`
+- `secrets.manual.createKubernetesSecrets=true`
+- `secrets.manual.generatedSecrets.application.stringData` (or `.data`)
+- `secrets.manual.generatedSecrets.shared.stringData` (or `.data`)
+
+Optional:
+
+- `secrets.manual.generatedSecrets.registryCredentials.enabled=true` and `dockerconfigjson` (recommended for GA)
+- `secrets.manual.generatedSecrets.tls.enabled=true` and `crt`/`key`
+- `secrets.manual.generatedSecrets.additional[]` for deployment-specific extra secrets
+
+Reference example:
+
+- `charts/plextrac/examples/values-manual-secrets.yaml`
+
+Security note:
+
+- Values files contain sensitive material in this mode. Prefer encrypted values tooling (for example SOPS) in GitOps workflows.
+- You can create any extra secret object per deployment with `generatedSecrets.additional` (custom `name`, `type`, `stringData`, and/or base64 `data`).
+- In manual auto-create mode, this chart validates required GA secret keys and fails Helm rendering if any required keys are missing.
+
+## Verify after install
 
 ```bash
 kubectl -n plextrac get externalsecret
@@ -128,8 +183,8 @@ kubectl -n plextrac get secret
 kubectl -n plextrac get pods
 ```
 
-Interpretation:
+Expected results by mode:
 
-- `externalSecrets` mode: expect `ExternalSecret` resources.
-- `csi` mode: expect `SecretProviderClass`.
-- `manual` mode: expect pre-created `Secret` objects and no generated external secret resources.
+- `externalSecrets`: `ExternalSecret` objects exist and populate target `Secret` objects.
+- `csi`: `SecretProviderClass` exists; synced `Secret` objects are present.
+- `manual`: either pre-created `Secret` objects are present, or Helm-generated secret resources are created when `createKubernetesSecrets=true`.

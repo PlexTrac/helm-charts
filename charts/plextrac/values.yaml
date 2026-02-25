@@ -32,6 +32,82 @@ secrets:
       provider: gcp
       parameters: {}
       secretObjects: []
+  manual:
+    createKubernetesSecrets: false
+    requiredKeys:
+      application:
+        - ADMIN_EMAIL
+        - API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE
+        - CB_ADMIN_PASS
+        - CB_ADMIN_USER
+        - CB_API_PASS
+        - CB_API_USER
+        - CKEDITOR_ENVIRONMENT_SECRET_KEY
+        - CLOUD_STORAGE_ACCESS_KEY
+        - CLOUD_STORAGE_SECRET_KEY
+        - COOKIE_KEY
+        - INTERNAL_API_KEY_SHARED
+        - JWT_KEY
+        - MFA_KEY
+        - MINIO_LOCAL_PASSWORD
+        - MINIO_LOCAL_USER
+        - MINIO_ROOT_PASSWORD
+        - MINIO_ROOT_USER
+        - PG_CKEDITOR_ADMIN_PASSWORD
+        - PG_CKEDITOR_ADMIN_USER
+        - PG_CKEDITOR_DB
+        - PG_CKEDITOR_RO_PASSWORD
+        - PG_CKEDITOR_RO_USER
+        - PG_CKEDITOR_RW_PASSWORD
+        - PG_CKEDITOR_RW_USER
+        - PG_CORE_ADMIN_PASSWORD
+        - PG_CORE_ADMIN_USER
+        - PG_CORE_AI_SQL_PASSWORD
+        - PG_CORE_AI_SQL_USER
+        - PG_CORE_DB
+        - PG_CORE_RO_PASSWORD
+        - PG_CORE_RO_USER
+        - PG_CORE_RW_PASSWORD
+        - PG_CORE_RW_USER
+        - PG_METRICS_PASSWORD
+        - PG_METRICS_USER
+        - PG_RUNBOOKS_ADMIN_PASSWORD
+        - PG_RUNBOOKS_ADMIN_USER
+        - PG_RUNBOOKS_DB
+        - PG_RUNBOOKS_RO_PASSWORD
+        - PG_RUNBOOKS_RO_USER
+        - PG_RUNBOOKS_RW_PASSWORD
+        - PG_RUNBOOKS_RW_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_USER
+        - PROVIDER_CODE_KEY
+        - REDIS_PASSWORD
+      shared:
+        - CKEDITOR_SERVER_LICENSE_KEY
+        - LAUNCH_DARKLY_SDK_KEY
+        - PENDO_API_KEY
+        - PLEXAI_ASKAI_GEMINI_API_KEY
+        - SENTRY_DSN_BACKEND
+        - pt-load-bq-sa-svc-acct-creds.json
+    generatedSecrets:
+      application:
+        name: application-secrets
+        stringData: {}
+        data: {}
+      shared:
+        name: shared-secrets
+        stringData: {}
+        data: {}
+      registryCredentials:
+        enabled: true
+        name: regcred-dorf
+        dockerconfigjson: ""
+      tls:
+        enabled: false
+        name: plextrac-com-tls
+        crt: ""
+        key: ""
+      additional: []
 
 images:
   backend:
