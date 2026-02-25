@@ -58,7 +58,9 @@
 #     generatedSecrets:
 #       application:
 #         name: application-secrets
-#         stringData: {}
+#         stringData:
+#           # Required. Fill with a valid admin email.
+#           ADMIN_EMAIL: ""
 #         data: {}
 #       shared:
 #         name: shared-secrets
