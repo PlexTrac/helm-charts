@@ -1,0 +1,24 @@
+secrets:
+  mode: csi
+  csi:
+    secretProviderClass:
+      enabled: true
+      name: plextrac-secrets-provider
+      provider: gcp
+      parameters:
+        secrets: |
+          - resourceName: "projects/YOUR_PROJECT/secrets/application-secrets/versions/latest"
+            path: "application-secrets"
+          - resourceName: "projects/YOUR_PROJECT/secrets/shared-secrets/versions/latest"
+            path: "shared-secrets"
+      secretObjects:
+        - secretName: application-secrets
+          type: Opaque
+          data:
+            - objectName: application-secrets
+              key: application-secrets
+        - secretName: shared-secrets
+          type: Opaque
+          data:
+            - objectName: shared-secrets
+              key: shared-secrets

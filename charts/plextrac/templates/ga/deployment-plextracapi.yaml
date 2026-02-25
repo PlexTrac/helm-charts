@@ -1,0 +1,276 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: plextracapi
+    app.kubernetes.io/component: core-backend
+    app.kubernetes.io/instance: plextracapi
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: plextracapi
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: plextracapi
+    serviceName: core-backend
+  name: plextracapi
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: plextracapi
+  strategy:
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: plextracapi
+        app.kubernetes.io/component: core-backend
+        app.kubernetes.io/instance: plextracapi
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: plextracapi
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        name: plextracapi
+        podMonitor: enable
+        serviceMonitor: enable
+        serviceName: core-backend
+    spec:
+      containers:
+      - args:
+        - ./dist/apps/plextracapi/src/index.js
+        command:
+        - node
+        env:
+        - name: ADMIN_EMAIL
+          valueFrom:
+            secretKeyRef:
+              key: ADMIN_EMAIL
+              name: application-secrets
+        - name: API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE
+          valueFrom:
+            secretKeyRef:
+              key: API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE
+              name: application-secrets
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CKEDITOR_ENVIRONMENT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CKEDITOR_ENVIRONMENT_SECRET_KEY
+              name: application-secrets
+        - name: CKEDITOR_SERVER_LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CKEDITOR_SERVER_LICENSE_KEY
+              name: shared-secrets
+        - name: CLOUD_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_ACCESS_KEY
+              name: application-secrets
+        - name: CLOUD_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_SECRET_KEY
+              name: application-secrets
+        - name: COOKIE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: COOKIE_KEY
+              name: application-secrets
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          valueFrom:
+            configMapKeyRef:
+              key: DL_GCP_DATALAKE_SA_KEY_PATH
+              name: env-config
+        - name: INTERNAL_API_KEY_SHARED
+          valueFrom:
+            secretKeyRef:
+              key: INTERNAL_API_KEY_SHARED
+              name: application-secrets
+        - name: JWT_KEY
+          valueFrom:
+            secretKeyRef:
+              key: JWT_KEY
+              name: application-secrets
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              key: LAUNCH_DARKLY_SDK_KEY
+              name: shared-secrets
+        - name: MFA_KEY
+          valueFrom:
+            secretKeyRef:
+              key: MFA_KEY
+              name: application-secrets
+        - name: NODE_OPTIONS
+          value: --max-old-space-size=2800
+        - name: PENDO_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: PENDO_API_KEY
+              name: shared-secrets
+        - name: PG_CORE_AI_SQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_AI_SQL_USER
+              name: application-secrets
+        - name: PG_CORE_AI_SQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_AI_SQL_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: PG_RUNBOOKS_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_DB
+              name: application-secrets
+        - name: PG_RUNBOOKS_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RO_PASSWORD
+              name: application-secrets
+        - name: PG_RUNBOOKS_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RO_USER
+              name: application-secrets
+        - name: PG_RUNBOOKS_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RW_PASSWORD
+              name: application-secrets
+        - name: PG_RUNBOOKS_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RW_USER
+              name: application-secrets
+        - name: PROVIDER_CODE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: PROVIDER_CODE_KEY
+              name: application-secrets
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: SENTRY_DSN_BACKEND
+          valueFrom:
+            secretKeyRef:
+              key: SENTRY_DSN_BACKEND
+              name: shared-secrets
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /api/v2/health/full
+            port: 4350
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        name: plextracapi
+        ports:
+        - containerPort: 4350
+          name: plextracapi
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /api/v2/health/full
+            port: 4350
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        resources:
+          limits:
+            cpu: 1150m
+            memory: 4Gi
+          requests:
+            cpu: 20m
+            memory: 250Mi
+        volumeMounts:
+        - mountPath: /usr/src/plextrac-api/uploads
+          name: plextracapi-vol
+        - mountPath: /usr/src/plextrac-api/localesOverride/en
+          name: whitelabeling-vol
+        - mountPath: /usr/src/plextrac-api/keys/gcp
+          name: pt-load-bq-creds-json-volume
+          readOnly: true
+      imagePullSecrets:
+      - name: regcred-dorf
+      initContainers:
+      - args:
+        - -c
+        - |
+          gcloud auth activate-service-account --key-file=/var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
+        command:
+        - /bin/sh
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
+        - name: CLOUDSDK_CONFIG
+          value: /tmp/gcloud
+        image: google/cloud-sdk:530.0.0-alpine
+        name: perform-gcloud-auth
+        volumeMounts:
+        - mountPath: /var/secrets/gcp
+          name: pt-load-bq-creds-json-volume
+          readOnly: true
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 15
+      volumes:
+      - name: plextracapi-vol
+        persistentVolumeClaim:
+          claimName: plextracapi-pvc
+      - name: whitelabeling-vol
+        persistentVolumeClaim:
+          claimName: whitelabeling-pvc
+      - name: pt-load-bq-creds-json-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: pt-load-bq-sa-svc-acct-creds.json
+            path: pt-load-bq-sa-svc-acct-creds.json
+          secretName: shared-secrets

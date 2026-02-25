@@ -1,0 +1,215 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: orchestrator
+    app.kubernetes.io/instance: event-orchestrator
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: event-orchestrator
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: event-orchestrator
+  name: event-orchestrator
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: event-orchestrator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: event-orchestrator
+        app.kubernetes.io/component: orchestrator
+        app.kubernetes.io/instance: event-orchestrator
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: event-orchestrator
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - args:
+        - run
+        - start:event-orchestrator
+        command:
+        - npm
+        env:
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CORE_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CORE_API_BASE_URL
+              name: env-config
+        - name: CTEM_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CTEM_API_BASE_URL
+              name: env-config
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/gcp/event-orchestrator-svc-acct-creds.json
+        - name: INTERNAL_API_KEY_SHARED
+          valueFrom:
+            secretKeyRef:
+              key: INTERNAL_API_KEY_SHARED
+              name: application-secrets
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              key: LAUNCH_DARKLY_SDK_KEY
+              name: shared-secrets
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              key: LOG_FORMAT
+              name: env-config
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              key: LOG_LEVEL
+              name: env-config
+        - name: LOG_SERVICE_NAME
+          value: event-orchestrator
+        - name: PG_CKEDITOR_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_DB
+              name: application-secrets
+        - name: PG_CKEDITOR_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CKEDITOR_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RO_USER
+              name: application-secrets
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: PLEXAI_DATASET_ID_FEEDBACK
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_DATASET_ID_FEEDBACK
+              name: env-config
+        - name: PLEXAI_EMBEDDING_ENDPOINT_ID
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_EMBEDDING_ENDPOINT_ID
+              name: env-config
+        - name: PLEXAI_EMBEDDING_PROJECT_ID
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_EMBEDDING_PROJECT_ID
+              name: env-config
+        - name: PLEXAI_EMBEDDING_REGION
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_EMBEDDING_REGION
+              name: env-config
+        - name: PLEXAI_GCP_WAREHOUSE_PROJECT
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_GCP_WAREHOUSE_PROJECT
+              name: env-config
+        - name: PLEXAI_GCP_WAREHOUSE_REGION
+          valueFrom:
+            configMapKeyRef:
+              key: PLEXAI_GCP_WAREHOUSE_REGION
+              name: env-config
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        name: event-orchestrator
+        ports:
+        - containerPort: 4354
+          name: event-orch-port
+        resources:
+          limits:
+            cpu: 1150m
+            memory: 2Gi
+          requests:
+            cpu: 50m
+            memory: 256Mi
+        volumeMounts:
+        - mountPath: /usr/src/plextrac-api/uploads
+          name: plextracapi-vol
+        - mountPath: /var/secrets/gcp
+          name: event-orchestrator-creds-json-volume
+          readOnly: true
+      imagePullSecrets:
+      - name: regcred-dorf
+      initContainers:
+      - args:
+        - -c
+        - |
+          gcloud auth activate-service-account --key-file=/var/secrets/gcp/event-orchestrator-svc-acct-creds.json
+        command:
+        - /bin/sh
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/gcp/event-orchestrator-svc-acct-creds.json
+        - name: CLOUDSDK_CONFIG
+          value: /tmp/gcloud
+        image: google/cloud-sdk:530.0.0-alpine
+        name: perform-gcloud-auth
+        volumeMounts:
+        - mountPath: /var/secrets/gcp
+          name: event-orchestrator-creds-json-volume
+          readOnly: true
+      restartPolicy: Always
+      volumes:
+      - name: plextracapi-vol
+        persistentVolumeClaim:
+          claimName: plextracapi-pvc
+      - name: event-orchestrator-creds-json-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: event-orchestrator-svc-acct-creds.json
+            path: event-orchestrator-svc-acct-creds.json
+          secretName: shared-secrets

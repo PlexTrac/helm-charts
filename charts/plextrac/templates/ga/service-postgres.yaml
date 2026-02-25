@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+    serviceName: postgres
+  name: postgres
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ports:
+  - name: pg-port
+    port: 5432
+    targetPort: pg-port
+  selector:
+    app: postgres

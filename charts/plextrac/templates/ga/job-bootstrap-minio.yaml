@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  labels:
+    app.kubernetes.io/version: 2.23.4
+  name: bootstrap-minio
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  backoffLimit: 2
+  parallelism: 1
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_ROOT_USER
+              name: application-secrets
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_ROOT_PASSWORD
+              name: application-secrets
+        - name: MINIO_LOCAL_USER
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_LOCAL_USER
+              name: application-secrets
+        - name: MINIO_LOCAL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_LOCAL_PASSWORD
+              name: application-secrets
+        - name: CLOUD_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_ACCESS_KEY
+              name: application-secrets
+        - name: CLOUD_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_SECRET_KEY
+              name: application-secrets
+        - name: MINIO_ENABLED
+          value: "true"
+        - name: UPSTREAM_CLOUD_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              key: UPSTREAM_CLOUD_BUCKET
+              name: env-config
+        image: {{ .Values.images.minioBootstrap.repository }}:{{ .Values.images.minioBootstrap.tag }}
+        name: bootstrap-minio
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Never

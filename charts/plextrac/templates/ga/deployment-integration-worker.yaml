@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: integration-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/instance: integration-worker
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: integration-worker
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: integration-worker
+    serviceName: integration-worker
+  name: integration-worker
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: integration-worker
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: integration-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/instance: integration-worker
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: integration-worker
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        name: integration-worker
+        serviceName: integration-worker
+    spec:
+      containers:
+      - args:
+        - run
+        - start:integration-worker
+        command:
+        - npm
+        env:
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              key: LAUNCH_DARKLY_SDK_KEY
+              name: shared-secrets
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: SENTRY_DSN_BACKEND
+          valueFrom:
+            secretKeyRef:
+              key: SENTRY_DSN_BACKEND
+              name: shared-secrets
+        - name: CLOUD_STORAGE_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUD_STORAGE_ENDPOINT
+              name: env-config
+        - name: CLOUD_STORAGE_SSL
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUD_STORAGE_SSL
+              name: env-config
+        - name: CLOUD_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_ACCESS_KEY
+              name: application-secrets
+        - name: CLOUD_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_SECRET_KEY
+              name: application-secrets
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /health
+            port: 9100
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        name: integration-worker
+        ports:
+        - containerPort: 9100
+          name: int-worker-port
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /health
+            port: 9100
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        resources:
+          limits:
+            cpu: 700m
+            memory: 2Gi
+          requests:
+            cpu: 20m
+            memory: 250Mi
+        volumeMounts:
+        - mountPath: /usr/src/plextrac-api/uploads
+          name: plextracapi-vol
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Always
+      volumes:
+      - name: plextracapi-vol
+        persistentVolumeClaim:
+          claimName: plextracapi-pvc

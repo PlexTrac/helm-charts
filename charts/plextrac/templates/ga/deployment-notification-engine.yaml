@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: notifications
+    app.kubernetes.io/instance: notification-engine
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: notification-engine
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+    name: notification-engine
+  name: notification-engine
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: notification-engine
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: notification-engine
+        app.kubernetes.io/component: notifications
+        app.kubernetes.io/instance: notifcation-engine
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: notifcation-engine
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - args:
+        - run
+        - start:notification-engine
+        command:
+        - npm
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE
+          valueFrom:
+            secretKeyRef:
+              key: API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE
+              name: application-secrets
+        - name: CORE_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CORE_API_BASE_URL
+              name: env-config
+        - name: CTEM_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CTEM_API_BASE_URL
+              name: env-config
+        - name: INTERNAL_API_KEY_SHARED
+          valueFrom:
+            secretKeyRef:
+              key: INTERNAL_API_KEY_SHARED
+              name: application-secrets
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - find /tmp/ -type f -name notification-engine-liveness-timestamp -mmin
+              -2
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 20
+          timeoutSeconds: 5
+        name: notification-engine
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - find /tmp/ -type f -name notification-engine-readiness-timestamp -mmin
+              -2
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 250m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+      imagePullSecrets:
+      - name: regcred-dorf

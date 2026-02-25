@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+    serviceName: minio
+  name: minio
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ports:
+  - name: minio-9000
+    port: 9000
+    targetPort: minio-9000
+  - name: minio-9001
+    port: 9001
+    targetPort: minio-9001
+  selector:
+    app: minio

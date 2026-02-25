@@ -1,0 +1,228 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  labels:
+    app.kubernetes.io/version: 2.23.4
+  name: migrations-and-etl
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  backoffLimit: 2
+  parallelism: 1
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: disabled
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/version: 2.23.4
+    spec:
+      containers:
+      - args:
+        - |
+          npm run maintenance:enableForDataOperationsIfNecessary && \
+          npm run pg:superuser:bootstrap --if-present && \
+          npm run pg:migrate && \
+          npm run pg:superuser:bootstrap:post-migration --if-present && \
+          npm run db:migrate && \
+          npm run ckeditor:environment:migration && \
+          npm run pg:etl up all && \
+          npm run maintenance:disable && \
+          npm run seed:prebuilt-content --if-present
+        command:
+        - /bin/sh
+        - -c
+        env:
+        - name: CB_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_PASS
+              name: application-secrets
+        - name: CB_API_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_API_USER
+              name: application-secrets
+        - name: CB_ADMIN_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_ADMIN_PASS
+              name: application-secrets
+        - name: CB_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_ADMIN_USER
+              name: application-secrets
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: application-secrets
+        - name: PG_SUPER_USER
+          valueFrom:
+            secretKeyRef:
+              key: POSTGRES_USER
+              name: application-secrets
+        - name: PG_SUPER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: POSTGRES_PASSWORD
+              name: application-secrets
+        - name: PG_MIGRATE_PATH
+          value: /usr/src/plextrac-api
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_DB
+              name: application-secrets
+        - name: PG_CORE_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RO_USER
+              name: application-secrets
+        - name: PG_CORE_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_RW_USER
+              name: application-secrets
+        - name: PG_CORE_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_ADMIN_PASSWORD
+              name: application-secrets
+        - name: PG_CORE_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_ADMIN_USER
+              name: application-secrets
+        - name: PG_RUNBOOKS_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_DB
+              name: application-secrets
+        - name: PG_RUNBOOKS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_ADMIN_PASSWORD
+              name: application-secrets
+        - name: PG_RUNBOOKS_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_ADMIN_USER
+              name: application-secrets
+        - name: PG_CKEDITOR_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_DB
+              name: application-secrets
+        - name: PG_CKEDITOR_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_ADMIN_PASSWORD
+              name: application-secrets
+        - name: PG_CKEDITOR_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_ADMIN_USER
+              name: application-secrets
+        - name: PG_RUNBOOKS_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_DB
+              name: application-secrets
+        - name: PG_RUNBOOKS_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RO_PASSWORD
+              name: application-secrets
+        - name: PG_RUNBOOKS_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RO_USER
+              name: application-secrets
+        - name: PG_RUNBOOKS_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RW_PASSWORD
+              name: application-secrets
+        - name: PG_RUNBOOKS_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_RUNBOOKS_RW_USER
+              name: application-secrets
+        - name: PG_CKEDITOR_DB
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_DB
+              name: application-secrets
+        - name: PG_CKEDITOR_RO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RO_PASSWORD
+              name: application-secrets
+        - name: PG_CKEDITOR_RO_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RO_USER
+              name: application-secrets
+        - name: PG_CKEDITOR_RW_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RW_PASSWORD
+              name: application-secrets
+        - name: PG_CKEDITOR_RW_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CKEDITOR_RW_USER
+              name: application-secrets
+        - name: CKEDITOR_ENVIRONMENT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CKEDITOR_ENVIRONMENT_SECRET_KEY
+              name: application-secrets
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              key: LAUNCH_DARKLY_SDK_KEY
+              name: shared-secrets
+        - name: CKEDITOR_MIGRATE
+          value: "true"
+        - name: PG_CORE_AI_SQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_AI_SQL_USER
+              name: application-secrets
+        - name: PG_CORE_AI_SQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_CORE_AI_SQL_PASSWORD
+              name: application-secrets
+        - name: RUXPIN_ENABLED
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: env-config
+        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        name: migrations-and-etl
+        volumeMounts:
+        - mountPath: /usr/src/plextrac-api/uploads
+          name: plextracapi-vol
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Never
+      volumes:
+      - name: plextracapi-vol
+        persistentVolumeClaim:
+          claimName: plextracapi-pvc

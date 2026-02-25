@@ -1,0 +1,39 @@
+name: chart-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+
+      - name: Validate chart version is SemVer
+        run: |
+          VERSION=$(awk '/^version:/{print $2; exit}' charts/plextrac/Chart.yaml)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Chart version is not SemVer: $VERSION"
+            exit 1
+          fi
+
+      - name: Helm lint
+        run: helm lint charts/plextrac
+
+      - name: Helm template smoke test
+        run: helm template plextrac charts/plextrac > /tmp/plextrac-render.yaml
+
+      - name: Secret pattern scan
+        run: .github/scripts/scan-secrets.sh

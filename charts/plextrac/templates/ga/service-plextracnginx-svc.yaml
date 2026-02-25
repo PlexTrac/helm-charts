@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+    serviceName: core-frontend
+  name: plextracnginx-svc
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ports:
+  - name: nginx-443
+    port: 443
+    targetPort: nginx-443
+  - name: nginx-80
+    port: 80
+    targetPort: nginx-80
+  selector:
+    app: plextracnginx

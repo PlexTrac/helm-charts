@@ -1,0 +1,68 @@
+apiVersion: v1
+data:
+  AI_ENDPOINT_ID: mg-endpoint-1753837357
+  AI_PROJECT_ID: "332537153758"
+  CB_BUCKET: reportMe
+  CKEDITOR_ENABLE_METRIC_LOGS: "true"
+  CKEDITOR_LOG_LEVEL: "30"
+  CKEDITOR_MIGRATE: "true"
+  CLIENT_DOMAIN_NAME: plextrac.localhost
+  CLOUD_STORAGE_ENDPOINT: minio
+  CLOUD_STORAGE_PORT: "9000"
+  CLOUD_STORAGE_SSL: "false"
+  COBALT_API_SERVER: https://api.demo-01.co27.io/
+  CORE_API_BASE_URL: http://plextracapi:4350
+  COUCHBASE_URL: http://plextracdb
+  CTEM_API_BASE_URL: http://ctem-api:3332
+  DATALAKE_ETL: "true"
+  DL_BUCKET_NAME: pt-prod-drop-gcs-0
+  DL_DATASET_NAME: pt_load_bq_0
+  DL_GCP_DATALAKE_SA_KEY_PATH: /usr/src/plextrac-api/keys/gcp/pt-load-bq-sa-svc-acct-creds.json
+  DL_GCP_PROJECT: pt-prod-data-warehouse-0
+  DL_GCP_REGION: us-west1
+  EDGESCAN_API_SERVER: https://plextrac.sandbox.edgescan.com/api/v1/
+  ENABLE_REQUEST_METRICS: "true"
+  GCP_PROJECT: pt-prod-managed-services
+  LOG_FORMAT: logfmt
+  LOG_LEVEL: info
+  MAILER_SECURE: "true"
+  MINIO_ENABLED: "true"
+  NODE_ENV: production
+  NOTIFICATION_DRY_RUN: "false"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://k8s-monitoring-alloy-receiver.k8s-monitoring.svc.cluster.local:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OVERRIDE_DATALAKE_ETL: "true"
+  OVERRIDE_PENDO_ENABLED: "true"
+  PG_HOST: postgres
+  PLATFORM_ARCHITECTURE: k3s
+  PLATFORM_HOSTING_TYPE: cloud
+  PLEXAI_ANSWER_ENDPOINT_ID: plexai-answer
+  PLEXAI_ANSWER_REGION: us-central1
+  PLEXAI_ASKAI_EMBEDDING_ENDPOINT_ID: mg-endpoint-1753837357
+  PLEXAI_ASKAI_EMBEDDING_REGION: us-central1
+  PLEXAI_ASKAI_GEMINI_API_MODEL_NAME: gemini-2.5-flash
+  PLEXAI_DATASET_ID_FEEDBACK: chat_data
+  PLEXAI_DATASET_ID_VECTOR: vanna_managed
+  PLEXAI_EMBEDDING_ENDPOINT_ID: mg-endpoint-1753456398
+  PLEXAI_EMBEDDING_PROJECT_ID: "332537153758"
+  PLEXAI_EMBEDDING_REGION: us-central1
+  PLEXAI_ENDPOINT_ID: mg-endpoint-1753837357
+  PLEXAI_GCP_PROJECT: pt-prod-managed-services
+  PLEXAI_GCP_REGION: us-central1
+  PLEXAI_GCP_WAREHOUSE_PROJECT: pt-prod-managed-services
+  PLEXAI_GCP_WAREHOUSE_REGION: us-central1
+  PLEXAI_PROJECT_ID: "332537153758"
+  PLEXAI_SUMMARIZATION_ENDPOINT_ID: mg-endpoint-1753324137
+  PLEXAI_SUMMARIZATION_REGION: us-central1
+  PLEXTRAC_MANAGED: legacy
+  REDIS_CONNECTION_STRING: redis://redis:6379
+  SYSTEM_LEVEL: PRODUCTION
+  UPSTREAM_CLOUD_BUCKET: cloud
+  UPSTREAM_CLOUD_HOST: minio
+  UPSTREAM_CLOUD_PREFIX: uploads
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/version: 2.23.4
+  name: env-config
+  namespace: {{ include "plextrac.namespace" . }}

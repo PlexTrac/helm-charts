@@ -5,3 +5,5 @@ kubeconfig.yaml
 *.lock
 .vscode
 *.tgz
+values.local.yaml
+*.local.values.yaml

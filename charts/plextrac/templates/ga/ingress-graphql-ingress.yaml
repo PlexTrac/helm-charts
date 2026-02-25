@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers Content-Security-Policy "default-src 'self';";
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+  name: graphql-ingress
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: SET_IN_OVERLAY
+    http:
+      paths:
+      - backend:
+          service:
+            name: plextracapi
+            port:
+              number: 4350
+        path: /graphql
+        pathType: ImplementationSpecific

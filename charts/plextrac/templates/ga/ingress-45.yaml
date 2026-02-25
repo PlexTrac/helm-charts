@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: SET_IN_OVERLAY
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      expires $expires;
+      gzip on;
+      gzip_vary on;
+      gzip_comp_level 4;
+      gzip_min_length 1000;
+      gzip_proxied expired no-cache no-store private;
+      gzip_types text/plain text/css text/xml application/xml text/javascript application/x-javascript application/javascript font/eot font/otf font/ttf image/svg+xml;
+      gzip_disable "msie6";
+      more_set_headers "Cache-Control private";
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  labels:
+    app.kubernetes.io/version: 2.23.4
+  name: plextracnginx-ingress
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: plextracnginx-svc
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+  - host: SET_IN_OVERLAY
+    http:
+      paths:
+      - backend:
+          service:
+            name: plextracnginx-svc
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - SET_IN_OVERLAY
+    secretName: SET_IN_OVERLAY

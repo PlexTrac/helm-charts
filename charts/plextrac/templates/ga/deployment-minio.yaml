@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: minio
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/instance: minio
+    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: plextrac
+    app.kubernetes.io/version: 2.23.4
+  name: minio
+  namespace: {{ include "plextrac.namespace" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+        prometheus.io/scrape: "true"
+      labels:
+        app: minio
+        app.kubernetes.io/component: storage
+        app.kubernetes.io/instance: minio
+        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/part-of: plextrac
+        app.kubernetes.io/version: 2.23.4
+        serviceName: minio
+    spec:
+      containers:
+      - args:
+        - server
+        - /data
+        - --console-address
+        - :9001
+        - --address
+        - 0.0.0.0:9000
+        command:
+        - minio
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_ROOT_USER
+              name: application-secrets
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_ROOT_PASSWORD
+              name: application-secrets
+        - name: MINIO_LOCAL_USER
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_LOCAL_USER
+              name: application-secrets
+        - name: MINIO_LOCAL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MINIO_LOCAL_PASSWORD
+              name: application-secrets
+        - name: CLOUD_STORAGE_ENDPOINT
+          value: 127.0.0.1
+        - name: CLOUD_STORAGE_PORT
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUD_STORAGE_PORT
+              name: env-config
+        - name: CLOUD_STORAGE_SSL
+          valueFrom:
+            configMapKeyRef:
+              key: CLOUD_STORAGE_SSL
+              name: env-config
+        - name: CLOUD_STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_ACCESS_KEY
+              name: application-secrets
+        - name: CLOUD_STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: CLOUD_STORAGE_SECRET_KEY
+              name: application-secrets
+        image: {{ .Values.images.minio.repository }}:{{ .Values.images.minio.tag }}
+        name: minio
+        ports:
+        - containerPort: 9000
+          name: minio-9000
+        - containerPort: 9001
+          name: minio-9001
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /data
+          name: minio-data
+      imagePullSecrets:
+      - name: regcred-dorf
+      restartPolicy: Always
+      volumes:
+      - name: minio-data
+        persistentVolumeClaim:
+          claimName: minio-pvc

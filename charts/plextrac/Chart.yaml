@@ -1,0 +1,14 @@
+apiVersion: v2
+name: plextrac
+description: PlexTrac application chart with multi-provider secret integration
+home: https://github.com/PlexTrac/helm-charts
+type: application
+version: 2.27.1
+appVersion: "2.27.1"
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - plextrac
+  - security
+  - saas
+maintainers:
+  - name: PlexTrac Platform
