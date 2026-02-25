@@ -26,6 +26,7 @@ Notes:
 - Kubernetes cluster access for target namespace
 - Helm 3
 - Chart path: `./charts/plextrac`
+- Set `global.ingress.host` to a valid DNS host for your environment
 
 Base install command:
 
@@ -155,6 +156,7 @@ Set:
 
 - `secrets.mode=manual`
 - `secrets.manual.createKubernetesSecrets=true`
+- `global.createNamespace=false` if the namespace already exists (or let the chart create it when true)
 - `secrets.manual.generatedSecrets.application.stringData` (or `.data`)
 - `secrets.manual.generatedSecrets.shared.stringData` (or `.data`)
 

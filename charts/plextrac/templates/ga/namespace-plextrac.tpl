@@ -1,4 +1,5 @@
 {{- include "plextrac.validateSecretMode" . }}
+{{- if .Values.global.createNamespace }}
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -6,4 +7,5 @@ metadata:
     argocd.argoproj.io/sync-options: Delete=false
   labels:
     app.kubernetes.io/version: 2.23.4
-  name: plextrac
+  name: {{ include "plextrac.namespace" . }}
+{{- end }}

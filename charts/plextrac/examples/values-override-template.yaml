@@ -1,0 +1,91 @@
+# Copy this file and uncomment only what you need for your environment.
+# Example:
+#   cp charts/plextrac/examples/values-override-template.yaml my-values.yaml
+#   helm upgrade --install plextrac ./charts/plextrac -f my-values.yaml --namespace plextrac --create-namespace
+
+# global:
+#   namespace: plextrac
+#   # Set false when namespace already exists.
+#   createNamespace: false
+#   ingress:
+#     # Required for valid Ingress objects.
+#     host: example.plextrac.com
+#     # TLS secret used by plextracnginx ingress.
+#     tlsSecretName: plextrac-com-tls
+#     # Optional. Set when using cert-manager.
+#     certManagerClusterIssuer: ""
+
+# secrets:
+#   # Choose one: externalSecrets | csi | manual
+#   mode: externalSecrets
+#
+#   # External Secrets Operator mode (default GA path)
+#   externalSecrets:
+#     refreshInterval: 1h
+#     secretStoreRef:
+#       kind: ClusterSecretStore
+#       name: gcp-cluster-secret-store
+#     application:
+#       targetSecretName: application-secrets
+#       remoteKey: your-application-secret-key
+#     shared:
+#       targetSecretName: shared-secrets
+#       remoteKey: your-shared-secret-key
+#       commonProperty: allstages
+#       stageProperty: ga
+#     registryCredentials:
+#       enabled: true
+#       targetSecretName: regcred-dorf
+#       remoteKey: regcred-dorf
+#     tls:
+#       enabled: true
+#       targetSecretName: plextrac-com-tls
+#       remoteKey: plextrac-com-tls
+#
+#   # Secrets Store CSI Driver mode
+#   csi:
+#     secretProviderClass:
+#       enabled: true
+#       name: plextrac-secrets-provider
+#       provider: gcp
+#       parameters: {}
+#       secretObjects: []
+#
+#   # Manual mode
+#   manual:
+#     # Set true to have this chart create required Kubernetes Secrets.
+#     createKubernetesSecrets: true
+#     generatedSecrets:
+#       application:
+#         name: application-secrets
+#         stringData: {}
+#         data: {}
+#       shared:
+#         name: shared-secrets
+#         stringData: {}
+#         data: {}
+#       registryCredentials:
+#         enabled: true
+#         name: regcred-dorf
+#         dockerconfigjson: ""
+#       tls:
+#         enabled: false
+#         name: plextrac-com-tls
+#         crt: ""
+#         key: ""
+#       # Optional per-deployment additional secret objects.
+#       additional: []
+#
+#     # Optional override if your deployment key contract differs from GA defaults.
+#     requiredKeys:
+#       application: []
+#       shared: []
+
+# Optional image overrides (tag pinning or custom repos)
+# images:
+#   backend:
+#     repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
+#     tag: 2.27.4
+#   nginx:
+#     repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
+#     tag: 2.27.4
