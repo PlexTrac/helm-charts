@@ -6,7 +6,15 @@
       "type": "object",
       "properties": {
         "namespace": { "type": "string", "minLength": 1 },
-        "createNamespace": { "type": "boolean" }
+        "createNamespace": { "type": "boolean" },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string", "minLength": 1 },
+            "tlsSecretName": { "type": "string", "minLength": 1 },
+            "certManagerClusterIssuer": { "type": "string" }
+          }
+        }
       },
       "required": ["namespace"]
     },

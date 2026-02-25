@@ -1,6 +1,10 @@
 global:
   namespace: plextrac
   createNamespace: true
+  ingress:
+    host: plextrac.example.com
+    tlsSecretName: plextrac-com-tls
+    certManagerClusterIssuer: ""
 
 secrets:
   mode: externalSecrets

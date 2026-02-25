@@ -12,7 +12,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: SET_IN_OVERLAY
+  - host: {{ include "plextrac.ingressHost" . }}
     http:
       paths:
       - backend:

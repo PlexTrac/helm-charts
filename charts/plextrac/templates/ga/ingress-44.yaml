@@ -22,7 +22,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: k3s-instance.plextrac.com
+  - host: {{ include "plextrac.ingressHost" . }}
     http:
       paths:
       - backend:

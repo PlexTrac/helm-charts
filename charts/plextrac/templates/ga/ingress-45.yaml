@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    cert-manager.io/cluster-issuer: SET_IN_OVERLAY
+    cert-manager.io/cluster-issuer: {{ default "" .Values.global.ingress.certManagerClusterIssuer | quote }}
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
     nginx.ingress.kubernetes.io/configuration-snippet: |
       expires $expires;
@@ -31,7 +31,7 @@ spec:
               number: 80
         path: /
         pathType: ImplementationSpecific
-  - host: SET_IN_OVERLAY
+  - host: {{ include "plextrac.ingressHost" . }}
     http:
       paths:
       - backend:
@@ -43,5 +43,5 @@ spec:
         pathType: ImplementationSpecific
   tls:
   - hosts:
-    - SET_IN_OVERLAY
-    secretName: SET_IN_OVERLAY
+    - {{ include "plextrac.ingressHost" . }}
+    secretName: {{ include "plextrac.ingressTlsSecretName" . }}

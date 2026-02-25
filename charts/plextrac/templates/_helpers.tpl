@@ -18,6 +18,14 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- default .Release.Namespace .Values.global.namespace -}}
 {{- end -}}
 
+{{- define "plextrac.ingressHost" -}}
+{{- default "plextrac.example.com" .Values.global.ingress.host -}}
+{{- end -}}
+
+{{- define "plextrac.ingressTlsSecretName" -}}
+{{- default "plextrac-com-tls" .Values.global.ingress.tlsSecretName -}}
+{{- end -}}
+
 {{- define "plextrac.validateSecretMode" -}}
 {{- if not (has .Values.secrets.mode (list "externalSecrets" "csi" "manual")) -}}
 {{- fail "values.secrets.mode must be one of: externalSecrets, csi, manual" -}}
