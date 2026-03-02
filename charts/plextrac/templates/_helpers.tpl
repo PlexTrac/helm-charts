@@ -54,6 +54,6 @@ imagePullSecrets:
 {{- else if eq $key "API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE" -}}
 {{- "{}" -}}
 {{- else -}}
-{{- randAlphaNum 40 -}}
+{{- randAlphaNum 32 -}}
 {{- end -}}
 {{- end -}}
