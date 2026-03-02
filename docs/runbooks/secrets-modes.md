@@ -8,17 +8,17 @@ Use this guide to configure secrets for the `plextrac` chart across all supporte
 
 ## Secret types this chart expects
 
-Regardless of mode, GA workloads expect these Kubernetes Secrets by name:
+Regardless of mode, workloads expect these Kubernetes Secrets by name:
 
 - `application-secrets` (`Opaque`)
 - `shared-secrets` (`Opaque`)
-- `regcred-dorf` (`kubernetes.io/dockerconfigjson`) for image pulls
 - `plextrac-com-tls` (`kubernetes.io/tls`) when ingress TLS is enabled
+- A registry pull secret only if using a private image registry (configured via `global.imagePullSecrets`)
 
 Notes:
 
-- Most workloads reference `application-secrets` and `shared-secrets` via `secretKeyRef`.
-- Image pull secrets are hardcoded to `regcred-dorf` in GA templates.
+- All workloads reference `application-secrets` and `shared-secrets` via `secretKeyRef`.
+- Image pull secrets are driven by `global.imagePullSecrets` and default to empty (DockerHub public images require no credentials).
 - TLS is represented as an `ExternalSecret` in `externalSecrets` mode, or a pre-created TLS secret in `manual`/CSI-backed setups.
 
 ## Common prerequisites
@@ -43,7 +43,7 @@ Use when External Secrets Operator is installed and connected to a `SecretStore`
 
 Reference values file:
 
-- `charts/plextrac/examples/values-ga.yaml`
+- `charts/plextrac/examples/values-external-secrets.yaml`
 
 Required values:
 
@@ -52,8 +52,6 @@ Required values:
 - `secrets.externalSecrets.secretStoreRef.name`
 - `secrets.externalSecrets.application.remoteKey`
 - `secrets.externalSecrets.shared.remoteKey`
-- `secrets.externalSecrets.shared.commonProperty`
-- `secrets.externalSecrets.shared.stageProperty` (for GA, typically `ga`)
 
 Optional generated secret types:
 
@@ -72,7 +70,7 @@ Install example:
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
   --create-namespace \
-  -f charts/plextrac/examples/values-ga.yaml
+  -f charts/plextrac/examples/values-external-secrets.yaml
 ```
 
 ## Mode 2: `csi`
@@ -176,7 +174,7 @@ Security note:
 - Values files contain sensitive material in this mode. Prefer encrypted values tooling (for example SOPS) in GitOps workflows.
 - You can create any extra secret object per deployment with `generatedSecrets.additional` (custom `name`, `type`, `stringData`, and/or base64 `data`).
 - In manual auto-create mode, this chart auto-populates missing GA required keys (or reuses existing secret values when present).
-- In manual auto-create mode, this chart also requires `generatedSecrets.registryCredentials.enabled=true` because GA templates reference `regcred-dorf` for image pulls.
+- Registry credentials are only needed if pulling from a private registry. Set `global.imagePullSecrets` to reference a pre-existing pull secret, or use `generatedSecrets.registryCredentials.enabled=true` to have the chart create it.
 
 ## Verify after install
 

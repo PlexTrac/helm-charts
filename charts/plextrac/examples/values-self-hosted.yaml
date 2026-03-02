@@ -1,0 +1,75 @@
+# Self-hosted PlexTrac deployment using manual secrets (recommended for most customers)
+# Secrets are auto-generated on first install and preserved on upgrade.
+# You MUST provide ADMIN_EMAIL and CKEDITOR_SERVER_LICENSE_KEY before installing.
+
+global:
+  namespace: plextrac
+  createNamespace: true
+  imagePullSecrets: []   # Leave empty for DockerHub public images.
+                         # Add [{name: ckeditor-registry-creds}] if using docker.cke-cs.com with a license.
+  ingress:
+    host: plextrac.mycompany.com   # Required: set to your actual domain
+    tlsSecretName: plextrac-com-tls
+    certManagerClusterIssuer: ""   # Set to your ClusterIssuer name if using cert-manager
+
+secrets:
+  mode: manual
+  manual:
+    createKubernetesSecrets: true
+    generatedSecrets:
+      application:
+        stringData:
+          ADMIN_EMAIL: "admin@mycompany.com"   # Required: initial admin email
+      shared:
+        stringData:
+          CKEDITOR_SERVER_LICENSE_KEY: ""   # Required if using CKEditor; leave empty to disable
+          LAUNCH_DARKLY_SDK_KEY: ""
+          PENDO_API_KEY: ""
+          SENTRY_DSN_BACKEND: ""
+      tls:
+        enabled: false   # Set to true and provide crt/key to manage TLS via Helm
+        # crt: |
+        #   -----BEGIN CERTIFICATE-----
+        #   ...
+        # key: |
+        #   -----BEGIN PRIVATE KEY-----
+        #   ...
+
+images:
+  backend:
+    repository: plextrac/plextracapi
+    tag: stable
+  nginx:
+    repository: plextrac/plextracnginx
+    tag: stable
+  ckeditor:
+    repository: docker.cke-cs.com/cs
+    tag: latest
+  plextracdb:
+    repository: plextrac/plextracdb
+    tag: 6.5.1
+  postgres:
+    repository: plextrac/plextracpostgres
+    tag: stable
+  redis:
+    repository: redis
+    tag: 8.4.0-alpine
+  redisExporter:
+    repository: oliver006/redis_exporter
+    tag: latest
+  minio:
+    repository: plextrac/minio
+    tag: latest
+  minioBootstrap:
+    repository: plextrac/plextrac-minio-bootstrap
+    tag: stable
+
+replicaCounts:
+  plextracapi: 3
+  ckeditor: 3
+  eventOrchestrator: 1
+  notificationEngine: 1
+  notificationSender: 1
+  integrationWorker: 1
+  contextualScoringService: 1
+  datalakeMaintainer: 0   # Disabled by default; set to 1 to enable

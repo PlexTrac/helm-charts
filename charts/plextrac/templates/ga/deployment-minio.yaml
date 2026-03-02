@@ -5,10 +5,9 @@ metadata:
     app: minio
     app.kubernetes.io/component: storage
     app.kubernetes.io/instance: minio
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: minio
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
   name: minio
   namespace: {{ include "plextrac.namespace" . }}
 spec:
@@ -27,12 +26,12 @@ spec:
         app: minio
         app.kubernetes.io/component: storage
         app.kubernetes.io/instance: minio
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: minio
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         serviceName: minio
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - server
@@ -103,8 +102,6 @@ spec:
         volumeMounts:
         - mountPath: /data
           name: minio-data
-      imagePullSecrets:
-      - name: regcred-dorf
       restartPolicy: Always
       volumes:
       - name: minio-data

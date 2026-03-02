@@ -5,16 +5,15 @@ metadata:
     app: plextracapi
     app.kubernetes.io/component: core-backend
     app.kubernetes.io/instance: plextracapi
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: plextracapi
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: plextracapi
     serviceName: core-backend
   name: plextracapi
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  replicas: 2
+  replicas: {{ .Values.replicaCounts.plextracapi }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -33,15 +32,15 @@ spec:
         app: plextracapi
         app.kubernetes.io/component: core-backend
         app.kubernetes.io/instance: plextracapi
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: plextracapi
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         name: plextracapi
         podMonitor: enable
         serviceMonitor: enable
         serviceName: core-backend
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - ./dist/apps/plextracapi/src/index.js
@@ -93,11 +92,6 @@ spec:
             secretKeyRef:
               key: COOKIE_KEY
               name: application-secrets
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          valueFrom:
-            configMapKeyRef:
-              key: DL_GCP_DATALAKE_SA_KEY_PATH
-              name: env-config
         - name: INTERNAL_API_KEY_SHARED
           valueFrom:
             secretKeyRef:
@@ -235,29 +229,6 @@ spec:
           name: plextracapi-vol
         - mountPath: /usr/src/plextrac-api/localesOverride/en
           name: whitelabeling-vol
-        - mountPath: /usr/src/plextrac-api/keys/gcp
-          name: pt-load-bq-creds-json-volume
-          readOnly: true
-      imagePullSecrets:
-      - name: regcred-dorf
-      initContainers:
-      - args:
-        - -c
-        - |
-          gcloud auth activate-service-account --key-file=/var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
-        command:
-        - /bin/sh
-        env:
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          value: /var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
-        - name: CLOUDSDK_CONFIG
-          value: /tmp/gcloud
-        image: google/cloud-sdk:530.0.0-alpine
-        name: perform-gcloud-auth
-        volumeMounts:
-        - mountPath: /var/secrets/gcp
-          name: pt-load-bq-creds-json-volume
-          readOnly: true
       restartPolicy: Always
       terminationGracePeriodSeconds: 15
       volumes:
@@ -267,10 +238,3 @@ spec:
       - name: whitelabeling-vol
         persistentVolumeClaim:
           claimName: whitelabeling-pvc
-      - name: pt-load-bq-creds-json-volume
-        secret:
-          defaultMode: 420
-          items:
-          - key: pt-load-bq-sa-svc-acct-creds.json
-            path: pt-load-bq-sa-svc-acct-creds.json
-          secretName: shared-secrets

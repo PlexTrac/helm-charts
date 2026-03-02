@@ -5,10 +5,9 @@ metadata:
     app: redis
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: redis
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: redis
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: redis
     serviceName: redis
   name: redis
@@ -28,13 +27,13 @@ spec:
         app: redis
         app.kubernetes.io/component: database
         app.kubernetes.io/instance: redis
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: redis
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         name: redis
         serviceName: redis
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - env:
         - name: REDIS_PASSWORD

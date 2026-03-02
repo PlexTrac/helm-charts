@@ -1,43 +1,42 @@
 global:
   namespace: plextrac
   createNamespace: true
+  imagePullSecrets: []   # e.g. [{name: ckeditor-registry-creds}]
   ingress:
-    host: plextrac.example.com
+    host: ""
     tlsSecretName: plextrac-com-tls
     certManagerClusterIssuer: ""
 
 secrets:
-  mode: externalSecrets
+  mode: manual
   externalSecrets:
     refreshInterval: 1h
     secretStoreRef:
       kind: ClusterSecretStore
-      name: gcp-cluster-secret-store
+      name: ""
     application:
       targetSecretName: application-secrets
-      remoteKey: placeholder_gcp_secret_name
+      remoteKey: ""
     shared:
       targetSecretName: shared-secrets
-      remoteKey: plextrac-shared-secrets
-      commonProperty: allstages
-      stageProperty: ga
+      remoteKey: ""
     registryCredentials:
-      enabled: true
+      enabled: false
       targetSecretName: regcred-dorf
-      remoteKey: regcred-dorf
+      remoteKey: ""
     tls:
-      enabled: true
+      enabled: false
       targetSecretName: plextrac-com-tls
-      remoteKey: plextrac-com-tls
+      remoteKey: ""
   csi:
     secretProviderClass:
       enabled: false
       name: plextrac-secrets-provider
-      provider: gcp
+      provider: ""
       parameters: {}
       secretObjects: []
   manual:
-    createKubernetesSecrets: false
+    createKubernetesSecrets: true
     requiredKeys:
       application:
         - ADMIN_EMAIL
@@ -46,6 +45,9 @@ secrets:
         - CB_ADMIN_USER
         - CB_API_PASS
         - CB_API_USER
+        - CB_BACKUP_PASS
+        - CB_BACKUP_USER
+        - CB_BUCKET
         - CKEDITOR_ENVIRONMENT_SECRET_KEY
         - CLOUD_STORAGE_ACCESS_KEY
         - CLOUD_STORAGE_SECRET_KEY
@@ -73,8 +75,6 @@ secrets:
         - PG_CORE_RO_USER
         - PG_CORE_RW_PASSWORD
         - PG_CORE_RW_USER
-        - PG_METRICS_PASSWORD
-        - PG_METRICS_USER
         - PG_RUNBOOKS_ADMIN_PASSWORD
         - PG_RUNBOOKS_ADMIN_USER
         - PG_RUNBOOKS_DB
@@ -91,18 +91,43 @@ secrets:
         - LAUNCH_DARKLY_SDK_KEY
         - PENDO_API_KEY
         - SENTRY_DSN_BACKEND
-        - pt-load-bq-sa-svc-acct-creds.json
     generatedSecrets:
       application:
         name: application-secrets
-        stringData: {}
+        stringData:
+          # Docker-compose static defaults (overridable)
+          CB_ADMIN_USER: ptadminuser
+          CB_API_USER: ptapiuser
+          CB_BACKUP_USER: ptbackupuser
+          CB_BUCKET: reportMe
+          POSTGRES_USER: postgres
+          PG_CORE_DB: core
+          PG_CORE_ADMIN_USER: core_admin
+          PG_CORE_RO_USER: core_ro
+          PG_CORE_RW_USER: core_rw
+          PG_CORE_AI_SQL_USER: ai_sql
+          PG_RUNBOOKS_DB: runbooks
+          PG_RUNBOOKS_ADMIN_USER: runbooks_admin
+          PG_RUNBOOKS_RO_USER: runbooks_ro
+          PG_RUNBOOKS_RW_USER: runbooks_rw
+          PG_CKEDITOR_DB: ckeditor
+          PG_CKEDITOR_ADMIN_USER: ckeditor_admin
+          PG_CKEDITOR_RO_USER: ckeditor_ro
+          PG_CKEDITOR_RW_USER: ckeditor_rw
+          MINIO_ROOT_USER: admin
+          MINIO_LOCAL_USER: localadmin
+          ADMIN_EMAIL: ""   # Customer must provide
         data: {}
       shared:
         name: shared-secrets
-        stringData: {}
+        stringData:
+          CKEDITOR_SERVER_LICENSE_KEY: ""   # Customer must provide
+          LAUNCH_DARKLY_SDK_KEY: ""
+          PENDO_API_KEY: ""
+          SENTRY_DSN_BACKEND: ""
         data: {}
       registryCredentials:
-        enabled: true
+        enabled: false   # DockerHub is public; enable if using a private registry
         name: regcred-dorf
         dockerconfigjson: ""
       tls:
@@ -114,19 +139,19 @@ secrets:
 
 images:
   backend:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
-    tag: 2.27.4
+    repository: plextrac/plextracapi
+    tag: stable
   nginx:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
-    tag: 2.27.4
-  ruxpin:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/ruxpin
-    tag: 2.18.2
+    repository: plextrac/plextracnginx
+    tag: stable
   ckeditor:
-    repository: registry.dorf.plextrac.ninja/ckeditor-registry-proxy/cs
-    tag: 4.25.0
+    repository: docker.cke-cs.com/cs
+    tag: latest
+  plextracdb:
+    repository: plextrac/plextracdb
+    tag: 6.5.1
   postgres:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracpostgres
+    repository: plextrac/plextracpostgres
     tag: stable
   redis:
     repository: redis
@@ -134,9 +159,19 @@ images:
   redisExporter:
     repository: oliver006/redis_exporter
     tag: latest
-  minioBootstrap:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextrac-minio-bootstrap
-    tag: stable
   minio:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/minio
+    repository: plextrac/minio
     tag: latest
+  minioBootstrap:
+    repository: plextrac/plextrac-minio-bootstrap
+    tag: stable
+
+replicaCounts:
+  plextracapi: 3
+  ckeditor: 3
+  eventOrchestrator: 1
+  notificationEngine: 1
+  notificationSender: 1
+  integrationWorker: 1
+  contextualScoringService: 1
+  datalakeMaintainer: 0   # Disabled by default for self-hosted

@@ -5,16 +5,15 @@ metadata:
     app: integration-worker
     app.kubernetes.io/component: worker
     app.kubernetes.io/instance: integration-worker
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: integration-worker
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: integration-worker
     serviceName: integration-worker
   name: integration-worker
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCounts.integrationWorker }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -33,13 +32,13 @@ spec:
         app: integration-worker
         app.kubernetes.io/component: worker
         app.kubernetes.io/instance: integration-worker
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: integration-worker
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         name: integration-worker
         serviceName: integration-worker
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - run
@@ -150,8 +149,6 @@ spec:
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol
-      imagePullSecrets:
-      - name: regcred-dorf
       restartPolicy: Always
       volumes:
       - name: plextracapi-vol

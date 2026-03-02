@@ -32,15 +32,26 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- end -}}
 {{- end -}}
 
+{{- define "plextrac.imagePullSecrets" -}}
+{{- with .Values.global.imagePullSecrets }}
+imagePullSecrets:
+{{- toYaml . | nindent 0 }}
+{{- end }}
+{{- end -}}
+
 {{- define "plextrac.manualSecretDefaultValue" -}}
 {{- $key := .key -}}
 {{- if eq $key "ADMIN_EMAIL" -}}
 {{- "" -}}
 {{- else if eq $key "CKEDITOR_SERVER_LICENSE_KEY" -}}
 {{- "" -}}
+{{- else if eq $key "LAUNCH_DARKLY_SDK_KEY" -}}
+{{- "" -}}
+{{- else if eq $key "PENDO_API_KEY" -}}
+{{- "" -}}
+{{- else if eq $key "SENTRY_DSN_BACKEND" -}}
+{{- "" -}}
 {{- else if eq $key "API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE" -}}
-{{- "{}" -}}
-{{- else if eq $key "pt-load-bq-sa-svc-acct-creds.json" -}}
 {{- "{}" -}}
 {{- else -}}
 {{- randAlphaNum 40 -}}

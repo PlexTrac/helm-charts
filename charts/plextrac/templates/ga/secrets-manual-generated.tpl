@@ -34,9 +34,6 @@
 {{- end }}
 {{- end }}
 {{- end }}
-{{- if not .Values.secrets.manual.generatedSecrets.registryCredentials.enabled }}
-{{- fail "secrets.manual.generatedSecrets.registryCredentials.enabled must be true when manual auto-create is enabled; GA workloads require regcred-dorf" }}
-{{- end }}
 apiVersion: v1
 kind: Secret
 metadata:

@@ -219,8 +219,7 @@ spec:
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol
-      imagePullSecrets:
-      - name: regcred-dorf
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       restartPolicy: Never
       volumes:
       - name: plextracapi-vol
