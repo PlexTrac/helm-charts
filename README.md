@@ -1,79 +1,55 @@
 # PlexTrac Helm Charts
 
-Public-ready Helm chart repository for deploying the PlexTrac platform on Kubernetes.
+Helm chart for deploying the PlexTrac platform on Kubernetes. Supports self-hosted and on-premises deployments.
 
-## Repository layout
-
-- `charts/plextrac`: primary chart
-- `charts/plextrac/examples`: GA, CSI, manual, and override template examples
-- `docs/migration`: migration and parity mapping from Kustomize manifests
-- `docs/runbooks`: release and support runbooks
-- `.github/workflows`: CI and release automation
-
-## Versioning
-
-- `charts/plextrac/Chart.yaml` `version` follows SemVer and tracks release cadence (example: `2.27.1`).
-- `appVersion` tracks application release signaling and can move independently.
-
-## Deployment profile
-
-This repository currently publishes and supports the **GA profile only**.
-
-Use:
-
-- default `charts/plextrac/values.yaml` (already GA-aligned), or
-- `charts/plextrac/examples/values-ga.yaml` for explicit GA installs.
-
-## Secrets model (kept for multi-provider support)
-
-Set `secrets.mode` in values:
-
-- `externalSecrets` (default GA path): creates `ExternalSecret` resources
-- `csi`: creates `SecretProviderClass` for CSI-based providers
-- `manual`: either references pre-existing Kubernetes Secrets or auto-creates required GA Kubernetes Secrets when `secrets.manual.createKubernetesSecrets=true`
-
-In `manual` auto-create mode, missing GA-required secret keys are generated automatically (or reused from existing in-cluster secret values).
-
-Detailed usage by mode: `docs/runbooks/secrets-modes.md`.
-
-Ingress host and TLS secret are configured via:
-
-- `global.ingress.host`
-- `global.ingress.tlsSecretName`
-- `global.ingress.certManagerClusterIssuer` (optional)
-
-Starter override template:
-
-- `charts/plextrac/examples/values-override-template.yaml`
-
-## Basic usage (GA)
+## Quick start
 
 ```bash
-helm upgrade --install plextrac ./charts/plextrac --namespace plextrac --create-namespace
-```
+# 1. Copy the starter values file
+cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
 
-```bash
-helm upgrade --install plextrac ./charts/plextrac \
-  -f charts/plextrac/examples/values-ga.yaml \
-  --namespace plextrac \
-  --create-namespace
-```
+# 2. Set your domain and admin email
+#    Edit my-values.yaml:
+#      global.ingress.host: plextrac.mycompany.com
+#      secrets.manual.generatedSecrets.application.stringData.ADMIN_EMAIL: admin@mycompany.com
 
-```bash
-cp charts/plextrac/examples/values-override-template.yaml my-values.yaml
-```
-
-```bash
+# 3. Install
 helm upgrade --install plextrac ./charts/plextrac \
   -f my-values.yaml \
   --namespace plextrac \
   --create-namespace
 ```
 
+See **[docs/user-guide.md](docs/user-guide.md)** for the complete installation and configuration guide.
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `charts/plextrac/` | The PlexTrac Helm chart |
+| `charts/plextrac/values.yaml` | Default values |
+| `charts/plextrac/examples/` | Ready-to-use configuration examples |
+| `docs/user-guide.md` | Full usage guide (start here) |
+| `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
+| `docs/migration/` | Kustomize → Helm migration guides |
+| `.github/workflows/` | CI and release automation |
+
+## Examples at a glance
+
+| File | Use case |
+|---|---|
+| `examples/values-self-hosted.yaml` | Manual secrets, DockerHub images — recommended default |
+| `examples/values-external-secrets.yaml` | External Secrets Operator |
+| `examples/values-csi-aws.yaml` | CSI driver with AWS Secrets Manager |
+| `examples/values-csi-gcp.yaml` | CSI driver with GCP Secret Manager |
+| `examples/values-override-template.yaml` | Blank template — copy and uncomment what you need |
+
+## Versioning
+
+`Chart.yaml` `version` follows SemVer. `appVersion` tracks the PlexTrac application release.
+
 ## CI and release
 
 - PR/main validation: `.github/workflows/chart-ci.yml`
 - Release pipeline: `.github/workflows/chart-release.yml`
-- Releases publish to both:
-  - OCI: `ghcr.io/<org>/charts/plextrac`
-  - GitHub Pages chart repo (`gh-pages` branch)
+- Releases publish to OCI (`ghcr.io/<org>/charts/plextrac`) and GitHub Pages (`gh-pages` branch)

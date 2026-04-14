@@ -4,10 +4,9 @@ metadata:
   labels:
     app.kubernetes.io/component: core-frontend
     app.kubernetes.io/instance: plextracnginx
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: plextracnginx
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: plextracnginx
   name: plextracnginx
   namespace: {{ include "plextrac.namespace" . }}
@@ -31,11 +30,11 @@ spec:
         app: plextracnginx
         app.kubernetes.io/component: core-frontend
         app.kubernetes.io/instance: plextracnginx
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: plextracnginx
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - env:
         - name: API_FQDN
@@ -83,17 +82,10 @@ spec:
           tcpSocket:
             port: 80
         resources:
-          limits:
-            cpu: 100m
-            memory: 150Mi
-          requests:
-            cpu: 3m
-            memory: 10Mi
+          {{- toYaml .Values.resources.nginx | nindent 10 }}
         volumeMounts:
         - mountPath: /etc/nginx/conf.d
           name: nginx-config-data
-      imagePullSecrets:
-      - name: regcred-dorf
       initContainers:
       - args:
         - set -x; cp -R /etc/nginx/conf.d/ volumes/nginx/ && cp /volumes/waf_rules/customer_curated.rules

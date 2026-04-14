@@ -4,10 +4,9 @@ metadata:
   labels:
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: plextracdb
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: plextracdb
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: plextracdb
     serviceName: couchbase
   name: plextracdb
@@ -27,12 +26,12 @@ spec:
         app: plextracdb
         app.kubernetes.io/component: database
         app.kubernetes.io/instance: plextracdb
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: plextracdb
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         serviceName: couchbase
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - env:
         - name: CB_API_PASS
@@ -55,7 +54,17 @@ spec:
             secretKeyRef:
               key: CB_ADMIN_USER
               name: application-secrets
-        image: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracdb:7.2.0
+        - name: CB_BACKUP_USER
+          valueFrom:
+            secretKeyRef:
+              key: CB_BACKUP_USER
+              name: application-secrets
+        - name: CB_BACKUP_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CB_BACKUP_PASS
+              name: application-secrets
+        image: {{ .Values.images.plextracdb.repository }}:{{ .Values.images.plextracdb.tag }}
         imagePullPolicy: Always
         lifecycle:
           postStart:
@@ -97,17 +106,10 @@ spec:
         - containerPort: 11210
           name: memcached-port
         resources:
-          limits:
-            cpu: 2000m
-            memory: 6.5Gi
-          requests:
-            cpu: 100m
-            memory: 1250Mi
+          {{- toYaml .Values.resources.plextracdb | nindent 10 }}
         volumeMounts:
         - mountPath: /opt/couchbase/var
           name: plextracdb-vol
-      imagePullSecrets:
-      - name: regcred-dorf
       restartPolicy: Always
       volumes:
       - name: plextracdb-vol

@@ -1,6 +1,6 @@
-# Self-hosted PlexTrac using CSI Secrets Store with GCP Secret Manager
-# Requires: secrets-store-csi-driver + secrets-store-csi-driver-provider-gcp installed.
-# Configure secretObjects to map GCP secret keys to the Kubernetes secret format
+# Self-hosted PlexTrac using CSI Secrets Store with AWS Secrets Manager
+# Requires: secrets-store-csi-driver + aws-secrets-manager-provider installed.
+# Configure secretObjects to map AWS secret keys to the Kubernetes secret format
 # expected by PlexTrac (application-secrets, shared-secrets).
 
 global:
@@ -18,23 +18,23 @@ secrets:
     secretProviderClass:
       enabled: true
       name: plextrac-secrets-provider
-      provider: gcp
+      provider: aws
       parameters:
-        secrets: |
-          - resourceName: "projects/my-gcp-project/secrets/plextrac-application-secrets/versions/latest"
-            fileName: "application-secrets"
-          - resourceName: "projects/my-gcp-project/secrets/plextrac-shared-secrets/versions/latest"
-            fileName: "shared-secrets"
+        objects: |
+          - objectName: "plextrac/application-secrets"
+            objectType: "secretsmanager"
+          - objectName: "plextrac/shared-secrets"
+            objectType: "secretsmanager"
       secretObjects:
         - secretName: application-secrets
           type: Opaque
           data:
-            - objectName: application-secrets
+            - objectName: "plextrac/application-secrets"
               key: application-secrets
         - secretName: shared-secrets
           type: Opaque
           data:
-            - objectName: shared-secrets
+            - objectName: "plextrac/shared-secrets"
               key: shared-secrets
 
 images:

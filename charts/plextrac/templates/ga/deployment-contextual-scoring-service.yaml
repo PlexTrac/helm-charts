@@ -4,15 +4,14 @@ metadata:
   labels:
     app.kubernetes.io/component: contextual-scoring
     app.kubernetes.io/instance: contextual-scoring
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: contextual-scoring
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: contextual-scoring-service
   name: contextual-scoring-service
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCounts.contextualScoringService }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -28,12 +27,12 @@ spec:
         app: contextual-scoring-service
         app.kubernetes.io/component: contextual-scoring
         app.kubernetes.io/instance: contextual-scoring
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: contextual-scoring
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         name: contextual-scoring-service
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - run
@@ -92,12 +91,5 @@ spec:
           initialDelaySeconds: 10
           timeoutSeconds: 10
         resources:
-          limits:
-            cpu: 800m
-            memory: 2Gi
-          requests:
-            cpu: 250m
-            memory: 100Mi
-      imagePullSecrets:
-      - name: regcred-dorf
+          {{- toYaml .Values.resources.contextualScoringService | nindent 10 }}
       restartPolicy: Always

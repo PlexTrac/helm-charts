@@ -5,10 +5,9 @@ metadata:
     app: postgres
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: postgres
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: postgres
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     serviceName: postgres
   name: postgres
   namespace: {{ include "plextrac.namespace" . }}
@@ -22,20 +21,18 @@ spec:
   template:
     metadata:
       annotations:
-        k8s.grafana.com/metrics.container: postgres-exporter
-        k8s.grafana.com/metrics.portName: pg-exporter
         linkerd.io/inject: enabled
         prometheus.io/scrape: "true"
       labels:
         app: postgres
         app.kubernetes.io/component: database
         app.kubernetes.io/instance: postgres
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: postgres
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
         serviceName: postgres
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - -c
@@ -57,16 +54,6 @@ spec:
           value: --auth-local=scram-sha-256 --auth-host=scram-sha-256
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
-        - name: PG_METRICS_USER
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_USER
-              name: application-secrets
-        - name: PG_METRICS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_PASSWORD
-              name: application-secrets
         - name: PG_CORE_DB
           valueFrom:
             secretKeyRef:
@@ -188,12 +175,7 @@ spec:
         - containerPort: 5432
           name: pg-port
         resources:
-          limits:
-            cpu: 2
-            memory: 6656Mi
-          requests:
-            cpu: 10m
-            memory: 256Mi
+          {{- toYaml .Values.resources.postgres | nindent 10 }}
         volumeMounts:
         - mountPath: /var/lib/postgresql/data
           name: postgres-data
@@ -201,37 +183,6 @@ spec:
           name: initdb
         - mountPath: /dev/shm
           name: dshm
-      - args:
-        - --collector.stat_statements
-        command:
-        - /bin/postgres_exporter
-        env:
-        - name: DATA_SOURCE_URI
-          value: localhost:5432/core?sslmode=disable
-        - name: DATA_SOURCE_USER
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_USER
-              name: application-secrets
-        - name: DATA_SOURCE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_PASSWORD
-              name: application-secrets
-        image: quay.io/prometheuscommunity/postgres-exporter:latest
-        name: postgres-exporter
-        ports:
-        - containerPort: 9187
-          name: pg-exporter
-        resources:
-          limits:
-            cpu: 200m
-            memory: 512Mi
-          requests:
-            cpu: 10m
-            memory: 256Mi
-      imagePullSecrets:
-      - name: regcred-dorf
       restartPolicy: Always
       volumes:
       - name: postgres-data

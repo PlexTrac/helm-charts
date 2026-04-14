@@ -7,10 +7,20 @@
       "properties": {
         "namespace": { "type": "string", "minLength": 1 },
         "createNamespace": { "type": "boolean" },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            },
+            "required": ["name"]
+          }
+        },
         "ingress": {
           "type": "object",
           "properties": {
-            "host": { "type": "string", "minLength": 1 },
+            "host": { "type": "string" },
             "tlsSecretName": { "type": "string", "minLength": 1 },
             "certManagerClusterIssuer": { "type": "string" }
           }
@@ -49,11 +59,9 @@
               "type": "object",
               "properties": {
                 "targetSecretName": { "type": "string" },
-                "remoteKey": { "type": "string" },
-                "commonProperty": { "type": "string" },
-                "stageProperty": { "type": "string" }
+                "remoteKey": { "type": "string" }
               },
-              "required": ["targetSecretName", "remoteKey", "commonProperty", "stageProperty"]
+              "required": ["targetSecretName", "remoteKey"]
             },
             "registryCredentials": {
               "type": "object",
@@ -62,7 +70,7 @@
                 "targetSecretName": { "type": "string" },
                 "remoteKey": { "type": "string" }
               },
-              "required": ["enabled", "targetSecretName", "remoteKey"]
+              "required": ["enabled"]
             },
             "tls": {
               "type": "object",
@@ -71,10 +79,10 @@
                 "targetSecretName": { "type": "string" },
                 "remoteKey": { "type": "string" }
               },
-              "required": ["enabled", "targetSecretName", "remoteKey"]
+              "required": ["enabled"]
             }
           },
-          "required": ["refreshInterval", "secretStoreRef", "application", "shared", "registryCredentials", "tls"]
+          "required": ["refreshInterval", "secretStoreRef", "application", "shared"]
         },
         "csi": {
           "type": "object",
@@ -188,7 +196,7 @@
       "required": [
         "backend",
         "nginx",
-        "ruxpin",
+        "plextracdb",
         "ckeditor",
         "postgres",
         "redis",
@@ -203,6 +211,19 @@
           "tag": { "type": "string", "minLength": 1 }
         },
         "required": ["repository", "tag"]
+      }
+    },
+    "replicaCounts": {
+      "type": "object",
+      "properties": {
+        "plextracapi": { "type": "integer", "minimum": 0 },
+        "ckeditor": { "type": "integer", "minimum": 0 },
+        "eventOrchestrator": { "type": "integer", "minimum": 0 },
+        "notificationEngine": { "type": "integer", "minimum": 0 },
+        "notificationSender": { "type": "integer", "minimum": 0 },
+        "integrationWorker": { "type": "integer", "minimum": 0 },
+        "contextualScoringService": { "type": "integer", "minimum": 0 },
+        "datalakeMaintainer": { "type": "integer", "minimum": 0 }
       }
     }
   },

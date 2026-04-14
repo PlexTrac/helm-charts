@@ -1,6 +1,6 @@
 apiVersion: v2
 name: plextrac
-description: PlexTrac application chart with multi-provider secret integration
+description: PlexTrac self-hosted application chart for on-premises and private cloud deployments
 home: https://github.com/PlexTrac/helm-charts
 type: application
 version: 2.27.1

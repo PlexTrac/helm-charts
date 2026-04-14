@@ -4,15 +4,14 @@ metadata:
   labels:
     app.kubernetes.io/component: datalake-maintainer
     app.kubernetes.io/instance: datalake-maintainer
-    app.kubernetes.io/managed-by: ArgoCD
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/name: datalake-maintainer
     app.kubernetes.io/part-of: plextrac
-    app.kubernetes.io/version: 2.23.4
     name: datalake-maintainer
   name: datalake-maintainer
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCounts.datalakeMaintainer }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -28,11 +27,11 @@ spec:
         app: datalake-maintainer
         app.kubernetes.io/component: datalake-maintainer
         app.kubernetes.io/instance: datalake-maintainer
-        app.kubernetes.io/managed-by: ArgoCD
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/name: datalake-maintainer
         app.kubernetes.io/part-of: plextrac
-        app.kubernetes.io/version: 2.23.4
     spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
       - args:
         - run
@@ -44,36 +43,6 @@ spec:
           valueFrom:
             configMapKeyRef:
               key: CLIENT_DOMAIN_NAME
-              name: env-config
-        - name: DATALAKE_ETL
-          valueFrom:
-            configMapKeyRef:
-              key: DATALAKE_ETL
-              name: env-config
-        - name: DL_BUCKET_NAME
-          valueFrom:
-            configMapKeyRef:
-              key: DL_BUCKET_NAME
-              name: env-config
-        - name: DL_DATASET_NAME
-          valueFrom:
-            configMapKeyRef:
-              key: DL_DATASET_NAME
-              name: env-config
-        - name: DL_GCP_PROJECT
-          valueFrom:
-            configMapKeyRef:
-              key: DL_GCP_PROJECT
-              name: env-config
-        - name: DL_GCP_REGION
-          valueFrom:
-            configMapKeyRef:
-              key: DL_GCP_REGION
-              name: env-config
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          valueFrom:
-            configMapKeyRef:
-              key: DL_GCP_DATALAKE_SA_KEY_PATH
               name: env-config
         - name: LOG_FORMAT
           valueFrom:
@@ -159,41 +128,5 @@ spec:
           timeoutSeconds: 1
         name: datalake-maintainer
         resources:
-          limits:
-            cpu: 250m
-            memory: 4Gi
-          requests:
-            cpu: 150m
-            memory: 128Mi
-        volumeMounts:
-        - mountPath: /usr/src/plextrac-api/keys/gcp
-          name: pt-load-bq-creds-json-volume
-          readOnly: true
-      imagePullSecrets:
-      - name: regcred-dorf
-      initContainers:
-      - args:
-        - -c
-        - |
-          gcloud auth activate-service-account --key-file=/var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
-        command:
-        - /bin/sh
-        env:
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          value: /var/secrets/gcp/pt-load-bq-sa-svc-acct-creds.json
-        - name: CLOUDSDK_CONFIG
-          value: /tmp/gcloud
-        image: google/cloud-sdk:530.0.0-alpine
-        name: perform-gcloud-auth
-        volumeMounts:
-        - mountPath: /var/secrets/gcp
-          name: pt-load-bq-creds-json-volume
-          readOnly: true
-      volumes:
-      - name: pt-load-bq-creds-json-volume
-        secret:
-          defaultMode: 420
-          items:
-          - key: pt-load-bq-sa-svc-acct-creds.json
-            path: pt-load-bq-sa-svc-acct-creds.json
-          secretName: shared-secrets
+          {{- toYaml .Values.resources.datalakeMaintainer | nindent 10 }}
+      restartPolicy: Always
