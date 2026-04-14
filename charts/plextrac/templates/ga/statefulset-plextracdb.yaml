@@ -106,12 +106,7 @@ spec:
         - containerPort: 11210
           name: memcached-port
         resources:
-          limits:
-            cpu: 2000m
-            memory: 6.5Gi
-          requests:
-            cpu: 100m
-            memory: 1250Mi
+          {{- toYaml .Values.resources.plextracdb | nindent 10 }}
         volumeMounts:
         - mountPath: /opt/couchbase/var
           name: plextracdb-vol

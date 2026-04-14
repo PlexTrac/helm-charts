@@ -218,12 +218,7 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 10
         resources:
-          limits:
-            cpu: 1150m
-            memory: 4Gi
-          requests:
-            cpu: 20m
-            memory: 250Mi
+          {{- toYaml .Values.resources.plextracapi | nindent 10 }}
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol

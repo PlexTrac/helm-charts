@@ -116,6 +116,8 @@ spec:
             secretKeyRef:
               key: CLOUD_STORAGE_SECRET_KEY
               name: application-secrets
+        - name: NODE_OPTIONS
+          value: --max-old-space-size=2800
         envFrom:
         - configMapRef:
             name: env-config
@@ -140,12 +142,7 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 10
         resources:
-          limits:
-            cpu: 700m
-            memory: 2Gi
-          requests:
-            cpu: 20m
-            memory: 250Mi
+          {{- toYaml .Values.resources.integrationWorker | nindent 10 }}
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol

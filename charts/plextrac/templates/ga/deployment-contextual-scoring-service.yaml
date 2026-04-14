@@ -91,10 +91,5 @@ spec:
           initialDelaySeconds: 10
           timeoutSeconds: 10
         resources:
-          limits:
-            cpu: 800m
-            memory: 2Gi
-          requests:
-            cpu: 250m
-            memory: 100Mi
+          {{- toYaml .Values.resources.contextualScoringService | nindent 10 }}
       restartPolicy: Always

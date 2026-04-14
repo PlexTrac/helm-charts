@@ -82,12 +82,7 @@ spec:
           tcpSocket:
             port: 80
         resources:
-          limits:
-            cpu: 100m
-            memory: 150Mi
-          requests:
-            cpu: 3m
-            memory: 10Mi
+          {{- toYaml .Values.resources.nginx | nindent 10 }}
         volumeMounts:
         - mountPath: /etc/nginx/conf.d
           name: nginx-config-data

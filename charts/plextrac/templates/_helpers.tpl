@@ -51,8 +51,8 @@ imagePullSecrets:
 {{- "" -}}
 {{- else if eq $key "SENTRY_DSN_BACKEND" -}}
 {{- "" -}}
-{{- else if eq $key "API_INTEGRATION_AUTH_CONFIG_NOTIFICATION_SERVICE" -}}
-{{- "{}" -}}
+{{- else if eq $key "CLOUD_STORAGE_ACCESS_KEY" -}}
+{{- randAlphaNum 20 -}}
 {{- else -}}
 {{- randAlphaNum 32 -}}
 {{- end -}}

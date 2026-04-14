@@ -100,7 +100,7 @@ secrets:
           CB_API_USER: ptapiuser
           CB_BACKUP_USER: ptbackupuser
           CB_BUCKET: reportMe
-          POSTGRES_USER: postgres
+          POSTGRES_USER: internalonly
           PG_CORE_DB: core
           PG_CORE_ADMIN_USER: core_admin
           PG_CORE_RO_USER: core_ro
@@ -175,3 +175,95 @@ replicaCounts:
   integrationWorker: 1
   contextualScoringService: 1
   datalakeMaintainer: 0   # Disabled by default for self-hosted
+
+resources:
+  plextracapi:
+    limits:
+      cpu: 1150m
+      memory: 4Gi
+    requests:
+      cpu: 20m
+      memory: 250Mi
+  nginx:
+    limits:
+      cpu: 100m
+      memory: 150Mi
+    requests:
+      cpu: 3m
+      memory: 10Mi
+  postgres:
+    limits:
+      cpu: "2"
+      memory: 6656Mi
+    requests:
+      cpu: 10m
+      memory: 256Mi
+  ckeditor:
+    limits:
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  contextualScoringService:
+    limits:
+      cpu: 800m
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 100Mi
+  datalakeMaintainer:
+    limits:
+      cpu: 250m
+      memory: 4Gi
+    requests:
+      cpu: 150m
+      memory: 128Mi
+  eventOrchestrator:
+    limits:
+      cpu: 1150m
+      memory: 2Gi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+  integrationWorker:
+    limits:
+      cpu: 1150m
+      memory: 4Gi
+    requests:
+      cpu: 20m
+      memory: 250Mi
+  notificationEngine:
+    limits:
+      cpu: 250m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  notificationSender:
+    limits:
+      cpu: 250m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  plextracdb:
+    limits:
+      cpu: 2000m
+      memory: 6.5Gi
+    requests:
+      cpu: 100m
+      memory: 1250Mi
+  redis:
+    limits:
+      cpu: 800m
+      memory: 2Gi
+    requests:
+      cpu: 30m
+      memory: 256Mi
+  redisExporter:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi

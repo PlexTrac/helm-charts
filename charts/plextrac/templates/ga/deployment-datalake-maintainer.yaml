@@ -128,10 +128,5 @@ spec:
           timeoutSeconds: 1
         name: datalake-maintainer
         resources:
-          limits:
-            cpu: 250m
-            memory: 4Gi
-          requests:
-            cpu: 150m
-            memory: 128Mi
+          {{- toYaml .Values.resources.datalakeMaintainer | nindent 10 }}
       restartPolicy: Always

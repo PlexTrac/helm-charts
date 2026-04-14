@@ -131,12 +131,7 @@ spec:
         - containerPort: 4354
           name: event-orch-port
         resources:
-          limits:
-            cpu: 1150m
-            memory: 2Gi
-          requests:
-            cpu: 50m
-            memory: 256Mi
+          {{- toYaml .Values.resources.eventOrchestrator | nindent 10 }}
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol

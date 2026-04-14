@@ -100,11 +100,7 @@ spec:
         - containerPort: 8000
           name: ckeditor-port
         resources:
-          limits:
-            memory: 2048Mi
-          requests:
-            cpu: 100m
-            memory: 300Mi
+          {{- toYaml .Values.resources.ckeditor | nindent 10 }}
       restartPolicy: Always
       volumes:
       - name: plextracapi-vol

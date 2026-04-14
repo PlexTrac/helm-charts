@@ -18,9 +18,13 @@ data:
 
   # Internal service URLs
   CORE_API_BASE_URL: http://plextracapi:4350
+  CTEM_API_BASE_URL: http://ctem-api:3332
   COUCHBASE_URL: http://plextracdb
   REDIS_CONNECTION_STRING: redis://redis:6379
   PG_HOST: postgres
+
+  # Couchbase
+  CB_BUCKET: reportMe
 
   # MinIO / object storage
   MINIO_ENABLED: "true"
