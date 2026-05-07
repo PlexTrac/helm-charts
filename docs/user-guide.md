@@ -643,7 +643,7 @@ helm upgrade --install plextrac ./charts/plextrac \
 **What happens during upgrade:**
 
 - Deployments and StatefulSets with changed specs are updated with the configured rolling-update strategy
-- The `migrations-and-etl` Job runs again (it is annotated with `argocd.argoproj.io/hook: Sync` — in plain Helm it runs on every `helm upgrade`)
+- The `migrations-and-etl` and `bootstrap-minio` Jobs are managed as Helm hooks (`post-install,post-upgrade` with `before-hook-creation` delete policy). Helm deletes the previous Job and creates a fresh one on every `helm upgrade`, which is required because `Job.spec.template` is immutable
 - Secrets in `manual` mode are preserved: the chart looks up existing secret values and reuses them for any key not explicitly set in `stringData`
 
 **Checking what would change before applying:**
