@@ -473,7 +473,56 @@ images:
 
 ### Using a private registry (imagePullSecrets)
 
-If your registry requires authentication, create a pull secret and reference it:
+If your registry requires authentication, every workload needs an `imagePullSecrets` reference pointing to a `kubernetes.io/dockerconfigjson` Secret. The chart wires this up automatically — you just have to make the Secret exist and tell the chart its name via `global.imagePullSecrets`.
+
+There are three ways to provide the Secret. Pick the one that matches your secrets workflow.
+
+#### Option 1 — Let the chart create the Secret from values (simplest)
+
+Use this when you're already using `secrets.mode: manual` (the default). The chart will create a `kubernetes.io/dockerconfigjson` Secret in the release namespace from a `dockerconfigjson` blob you supply in your values file.
+
+**Step 1 — generate the dockerconfigjson blob.** The easiest way is to have `kubectl` build it for you and print the contents:
+
+```bash
+kubectl create secret docker-registry tmp \
+  --docker-server=registry.mycompany.com \
+  --docker-username=myuser \
+  --docker-password=mypassword \
+  --dry-run=client -o json \
+  | jq -r '.data[".dockerconfigjson"]' \
+  | base64 -d
+```
+
+This prints a single-line JSON blob that looks like:
+
+```json
+{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}
+```
+
+**Step 2 — paste it into your values file:**
+
+```yaml
+secrets:
+  mode: manual
+  manual:
+    generatedSecrets:
+      registryCredentials:
+        enabled: true
+        name: regcred-dorf
+        dockerconfigjson: '{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}'
+
+global:
+  imagePullSecrets:
+    - name: regcred-dorf   # must match the name above
+```
+
+**Step 3 — install or upgrade as usual.** The chart creates the Secret and every Deployment / StatefulSet / Job picks it up.
+
+> **Security note:** The `dockerconfigjson` value contains a base64-encoded (not encrypted) password and ends up in Helm release history. Treat your values file like a credential. If this is a concern, use Option 2 or Option 3 instead, or keep registry creds in a separate values file (`-f secrets-overrides.yaml`) that is excluded from version control.
+
+#### Option 2 — Pre-create the Secret with `kubectl`
+
+Use this when you'd rather keep registry credentials out of values files entirely.
 
 ```bash
 kubectl -n plextrac create secret docker-registry my-registry-creds \
@@ -482,15 +531,70 @@ kubectl -n plextrac create secret docker-registry my-registry-creds \
   --docker-password=mypassword
 ```
 
-Then in your values:
+Then in your values, just point at it by name:
 
 ```yaml
 global:
   imagePullSecrets:
     - name: my-registry-creds
+
+secrets:
+  manual:
+    generatedSecrets:
+      registryCredentials:
+        enabled: false   # chart won't try to create it
 ```
 
-This is applied to every workload in the chart. Leave the list empty (`[]`) when using public images.
+You can list multiple if you pull from more than one registry:
+
+```yaml
+global:
+  imagePullSecrets:
+    - name: my-registry-creds
+    - name: ckeditor-registry-creds
+```
+
+#### Option 3 — Sync the Secret from External Secrets Operator
+
+Use this when you're already running ESO and storing registry credentials in AWS Secrets Manager / GCP Secret Manager / Vault / etc. The chart includes an `ExternalSecret` template that pulls a `dockerconfigjson` value from your secret store and materializes it as a `kubernetes.io/dockerconfigjson` Secret.
+
+The remote secret value must already be a valid dockerconfigjson string (build it the same way as Step 1 of Option 1, then store the JSON blob in your secret backend).
+
+```yaml
+secrets:
+  mode: externalSecrets
+  externalSecrets:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: my-cluster-secret-store
+    registryCredentials:
+      enabled: true
+      targetSecretName: regcred-dorf
+      remoteKey: plextrac/registry-credentials   # key in your secret backend
+
+global:
+  imagePullSecrets:
+    - name: regcred-dorf   # must match targetSecretName above
+```
+
+#### Verification
+
+After installing, confirm the secret is attached to a pod:
+
+```bash
+kubectl -n plextrac get pod <pod-name> -o jsonpath='{.spec.imagePullSecrets}'
+```
+
+If you see `ImagePullBackOff` on a pod, describe it to see the registry response:
+
+```bash
+kubectl -n plextrac describe pod <pod-name> | grep -A 5 Events
+```
+
+Common causes: the secret name in `global.imagePullSecrets` doesn't match the Secret that was created, the credentials are wrong, or the image repository overrides under `images:` still point at the public DockerHub path instead of your private registry.
+
+Leave `global.imagePullSecrets` empty (`[]`) when using public images.
 
 ---
 
@@ -539,7 +643,7 @@ helm upgrade --install plextrac ./charts/plextrac \
 **What happens during upgrade:**
 
 - Deployments and StatefulSets with changed specs are updated with the configured rolling-update strategy
-- The `migrations-and-etl` Job runs again (it is annotated with `argocd.argoproj.io/hook: Sync` — in plain Helm it runs on every `helm upgrade`)
+- The `migrations-and-etl` and `bootstrap-minio` Jobs are managed as Helm hooks (`post-install,post-upgrade` with `before-hook-creation` delete policy). Helm deletes the previous Job and creates a fresh one on every `helm upgrade`, which is required because `Job.spec.template` is immutable
 - Secrets in `manual` mode are preserved: the chart looks up existing secret values and reuses them for any key not explicitly set in `stringData`
 
 **Checking what would change before applying:**
