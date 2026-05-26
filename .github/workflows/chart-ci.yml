@@ -8,8 +8,33 @@ on:
 
 permissions:
   contents: read
+  security-events: write   # allows gitleaks to upload SARIF results
 
 jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so gitleaks can scan all commits
+
+      - name: Install Gitleaks
+        run: |
+          VERSION=8.21.2
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+
+      - name: Scan current working tree
+        run: gitleaks detect --source . --config .gitleaks.toml --verbose
+
+      - name: Scan full git history
+        # Scans every commit reachable from HEAD — catches secrets that were
+        # committed and later removed/overwritten.
+        run: gitleaks detect --config .gitleaks.toml --verbose
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -35,5 +60,8 @@ jobs:
       - name: Helm template smoke test
         run: helm template plextrac charts/plextrac > /tmp/plextrac-render.yaml
 
-      - name: Secret pattern scan
+      - name: Quick secret pattern sanity check
+        # Lightweight fallback — gitleaks (in the secrets-scan job) is the
+        # authoritative scanner.  This catches obvious plaintext values that
+        # don't require the full gitleaks rule set.
         run: .github/scripts/scan-secrets.sh
