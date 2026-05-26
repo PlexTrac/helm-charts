@@ -63,6 +63,13 @@ create_or_replace_secret() {
   echo "Secret '$name' applied in namespace '$NAMESPACE'."
 }
 
+# ── Ensure namespace exists ──────────────────────────────────────────────────
+if [[ "$DRY_RUN" == true ]]; then
+  echo "[dry-run] Would ensure namespace '$NAMESPACE' exists"
+else
+  kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 # ── PlexTrac registry ────────────────────────────────────────────────────────
 if [[ -z "${DOCKER_REGISTRY:-}" || -z "${DOCKER_USERNAME:-}" || -z "${DOCKER_PASSWORD:-}" ]]; then
   echo "ERROR: DOCKER_REGISTRY, DOCKER_USERNAME, and DOCKER_PASSWORD must be set in $ENV_FILE"
