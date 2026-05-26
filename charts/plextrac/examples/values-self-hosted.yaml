@@ -5,8 +5,8 @@
 global:
   namespace: plextrac
   createNamespace: true
-  imagePullSecrets: []   # Leave empty for DockerHub public images.
-                         # Add [{name: ckeditor-registry-creds}] if using docker.cke-cs.com with a license.
+  imagePullSecrets: []   # Must reference a secret with credentials for registry.plextrac.com.
+                         # See docs/user-guide.md § Docker registry credentials for setup steps.
   ingress:
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls

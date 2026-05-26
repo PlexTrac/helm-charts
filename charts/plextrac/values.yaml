@@ -130,7 +130,7 @@ secrets:
           SENTRY_DSN_BACKEND: ""
         data: {}
       registryCredentials:
-        enabled: false   # DockerHub is public; enable if using a private registry
+        enabled: false   # Set to true and provide dockerconfigjson to pull PlexTrac images
         name: regcred-dorf
         dockerconfigjson: ""
       tls:
