@@ -7,6 +7,9 @@ global:
     tlsSecretName: plextrac-com-tls
     certManagerClusterIssuer: ""
 
+storage:
+  storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
+
 secrets:
   mode: manual
   externalSecrets:

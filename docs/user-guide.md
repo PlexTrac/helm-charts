@@ -12,12 +12,13 @@ This guide covers everything you need to install, configure, and upgrade PlexTra
 4. [Setting the ingress hostname](#setting-the-ingress-hostname)
 5. [Overriding values](#overriding-values)
 6. [Secrets configuration](#secrets-configuration)
-7. [TLS configuration](#tls-configuration)
-8. [Image overrides](#image-overrides)
-9. [Replica counts](#replica-counts)
-10. [Upgrading](#upgrading)
-11. [Verifying the installation](#verifying-the-installation)
-12. [Troubleshooting](#troubleshooting)
+7. [Storage configuration](#storage-configuration)
+8. [TLS configuration](#tls-configuration)
+9. [Image overrides](#image-overrides)
+10. [Replica counts](#replica-counts)
+11. [Upgrading](#upgrading)
+12. [Verifying the installation](#verifying-the-installation)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,8 +26,9 @@ This guide covers everything you need to install, configure, and upgrade PlexTra
 
 - **Kubernetes** >= 1.25
 - **Helm** >= 3.10
-- A running **Ingress controller** (nginx-ingress or equivalent)
-- **Persistent storage** — a default StorageClass that can provision ReadWriteOnce PVCs
+- **NGINX Ingress Controller** — all ingress resources use `ingressClassName: nginx` and nginx-specific annotations; other ingress controllers are not supported without values changes
+- **A StorageClass** that can provision `ReadWriteOnce` PVCs — the chart defaults to `local-path` (K3s built-in); set `storage.storageClassName` for other platforms (see [Storage configuration](#storage-configuration) below)
+- **Node capacity** — minimum ~1.6 CPU cores and ~4.3 GiB RAM in requests across the cluster at default replica counts; ~41 GiB persistent storage
 - DNS or `/etc/hosts` entry pointing your chosen hostname to the cluster ingress IP
 
 Optional, depending on your secrets strategy:
@@ -34,6 +36,70 @@ Optional, depending on your secrets strategy:
 - [External Secrets Operator](https://external-secrets.io/) for `externalSecrets` mode
 - [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) for `csi` mode
 - [cert-manager](https://cert-manager.io/) if you want automatic TLS certificate provisioning
+
+### Platform-specific prerequisites
+
+#### K3s (self-managed)
+
+K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageClass — no additional OS packages or container runtime setup is needed. The only add-on required before installing the chart is NGINX Ingress Controller, because K3s ships Traefik by default:
+
+```bash
+# Option A — disable Traefik at K3s install time, then add NGINX
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+
+# Option B — run NGINX alongside Traefik (both can coexist)
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+```
+
+No change to `storage.storageClassName` is needed — the default `local-path` matches K3s's built-in provisioner.
+
+**OS requirements for K3s nodes:**
+- Linux: Ubuntu 20.04+, Debian 11+, RHEL/Rocky/AlmaLinux 8+, or any distro [supported by K3s](https://docs.k3s.io/installation/requirements)
+- Kernel ≥ 5.4
+- Ports 6443 (API), 80 and 443 (ingress) open
+- No separate container runtime installation needed
+
+**Minimum node sizing:** 4 vCPU, 16 GiB RAM, 100 GiB disk for a single-node production deployment.
+
+#### GKE, AKS, EKS (managed Kubernetes)
+
+The node OS is fully managed by the cloud provider. You only need to manage cluster version (≥ 1.25), node pool sizing, and cluster access credentials.
+
+Two add-ons are required before installing the chart:
+
+**1 — NGINX Ingress Controller** (same on all three platforms):
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+```
+
+**2 — Set `storage.storageClassName`** to a StorageClass that exists in your cluster:
+
+| Platform | Recommended StorageClass | Notes |
+|---|---|---|
+| GKE | `premium-rwo` | SSD-backed; use `standard-rwo` for HDD |
+| AKS | `managed-premium` | SSD-backed; use `default` for HDD |
+| EKS | `gp3` | Requires EBS CSI driver add-on; `gp2` works on older clusters |
+
+```yaml
+# In your values file:
+storage:
+  storageClassName: gp3   # or premium-rwo, managed-premium, etc.
+```
+
+For EKS, ensure the **EBS CSI driver** add-on is enabled in your cluster before installing, or the `gp3` StorageClass won't be available.
+
+**Optional but commonly used on managed K8s:**
+
+- cert-manager — all three platforms have native certificate options, but the chart's cert-manager annotation (`cert-manager.io/cluster-issuer`) won't work without it
+- External Secrets Operator — integrates natively with AWS Secrets Manager, GCP Secret Manager, and Azure Key Vault via `secrets.mode: externalSecrets`
 
 ---
 
@@ -355,6 +421,27 @@ secrets:
 See `charts/plextrac/examples/values-csi-aws.yaml` and `values-csi-gcp.yaml` for provider-specific examples.
 
 For full details on all three modes, see [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
+
+---
+
+## Storage configuration
+
+The chart creates 7 PersistentVolumeClaims. The StorageClass used for all of them is controlled by a single value:
+
+```yaml
+storage:
+  storageClassName: local-path   # default — matches K3s built-in provisioner
+```
+
+Change this to match the StorageClass available in your cluster. See [platform-specific prerequisites](#platform-specific-prerequisites) for the right value per platform.
+
+To see what StorageClasses are available in your cluster:
+
+```bash
+kubectl get storageclass
+```
+
+> **Note:** Changing `storage.storageClassName` after initial install does **not** migrate existing PVCs. PVCs are immutable after creation. If you need to change the StorageClass on an existing deployment, you must back up data, delete and recreate the PVCs, and restore. For this reason, set the correct StorageClass before first install.
 
 ---
 
@@ -728,11 +815,13 @@ kubectl -n plextrac get pvc
 kubectl -n plextrac describe pvc <pvc-name>
 ```
 
-Pending PVCs mean no StorageClass can fulfill the claim. Verify your cluster has a default StorageClass:
+Pending PVCs mean no StorageClass can fulfill the claim. Verify your cluster has a StorageClass matching `storage.storageClassName` (default: `local-path`):
 
 ```bash
 kubectl get storageclass
 ```
+
+If the StorageClass doesn't exist, set `storage.storageClassName` to one that does. See [Storage configuration](#storage-configuration) and [platform-specific prerequisites](#platform-specific-prerequisites).
 
 ### Pods stuck in `Init:Error` or `Init:CrashLoopBackOff`
 
