@@ -60,7 +60,7 @@
 #       application:
 #         name: application-secrets
 #         stringData:
-#           # Required. Fill with a valid admin email.
+#           # Optional: admin notification email.
 #           ADMIN_EMAIL: ""
 #         data: {}
 #       shared:

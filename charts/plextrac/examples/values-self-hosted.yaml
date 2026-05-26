@@ -1,6 +1,6 @@
 # Self-hosted PlexTrac deployment using manual secrets (recommended for most customers)
 # Secrets are auto-generated on first install and preserved on upgrade.
-# You MUST provide ADMIN_EMAIL and CKEDITOR_SERVER_LICENSE_KEY before installing.
+# Set global.ingress.host to your domain before installing.
 
 global:
   namespace: plextrac
@@ -19,7 +19,7 @@ secrets:
     generatedSecrets:
       application:
         stringData:
-          ADMIN_EMAIL: "admin@mycompany.com"   # Required: initial admin email
+          ADMIN_EMAIL: ""   # Optional: admin notification email
       shared:
         stringData:
           CKEDITOR_SERVER_LICENSE_KEY: ""   # Required if using CKEditor; leave empty to disable

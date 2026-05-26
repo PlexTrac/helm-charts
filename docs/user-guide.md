@@ -1,111 +1,31 @@
-# PlexTrac Helm Chart — User Guide
-
-This guide covers everything you need to install, configure, and upgrade PlexTrac on Kubernetes using the `plextrac` Helm chart.
+# PlexTrac Helm Chart — Installation & Configuration Guide
 
 ---
 
 ## Table of contents
 
-1. [Prerequisites](#prerequisites)
-2. [Chart overview](#chart-overview)
-3. [Installation](#installation)
-4. [Setting the ingress hostname](#setting-the-ingress-hostname)
-5. [Overriding values](#overriding-values)
-6. [Secrets configuration](#secrets-configuration)
-7. [Storage configuration](#storage-configuration)
-8. [TLS configuration](#tls-configuration)
-9. [Image overrides](#image-overrides)
-10. [Replica counts](#replica-counts)
-11. [Upgrading](#upgrading)
-12. [Verifying the installation](#verifying-the-installation)
-13. [Troubleshooting](#troubleshooting)
+1. [Before you begin](#before-you-begin)
+2. [Phase 1 — Set up your cluster](#phase-1--set-up-your-cluster)
+3. [Phase 2 — Gather credentials and secrets](#phase-2--gather-credentials-and-secrets)
+4. [Phase 3 — Configure your values file](#phase-3--configure-your-values-file)
+5. [Phase 4 — Install](#phase-4--install)
+6. [Phase 5 — Verify](#phase-5--verify)
+7. [Reference: Secrets configuration](#reference-secrets-configuration)
+8. [Reference: Storage configuration](#reference-storage-configuration)
+9. [Reference: TLS configuration](#reference-tls-configuration)
+10. [Reference: Image overrides](#reference-image-overrides)
+11. [Reference: Replica counts](#reference-replica-counts)
+12. [Reference: Overriding values](#reference-overriding-values)
+13. [Upgrading](#upgrading)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Prerequisites
+## Before you begin
 
-- **Kubernetes** >= 1.25
-- **Helm** >= 3.10
-- **NGINX Ingress Controller** — all ingress resources use `ingressClassName: nginx` and nginx-specific annotations; other ingress controllers are not supported without values changes
-- **A StorageClass** that can provision `ReadWriteOnce` PVCs — the chart defaults to `local-path` (K3s built-in); set `storage.storageClassName` for other platforms (see [Storage configuration](#storage-configuration) below)
-- **Node capacity** — minimum ~1.6 CPU cores and ~4.3 GiB RAM in requests across the cluster at default replica counts; ~41 GiB persistent storage
-- DNS or `/etc/hosts` entry pointing your chosen hostname to the cluster ingress IP
+Read through this checklist before touching any `helm` command. Installing the chart before cluster infrastructure and credentials are in place is the most common source of failed installs.
 
-Optional, depending on your secrets strategy:
-
-- [External Secrets Operator](https://external-secrets.io/) for `externalSecrets` mode
-- [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) for `csi` mode
-- [cert-manager](https://cert-manager.io/) if you want automatic TLS certificate provisioning
-
-### Platform-specific prerequisites
-
-#### K3s (self-managed)
-
-K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageClass — no additional OS packages or container runtime setup is needed. The only add-on required before installing the chart is NGINX Ingress Controller, because K3s ships Traefik by default:
-
-```bash
-# Option A — disable Traefik at K3s install time, then add NGINX
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
-
-# Option B — run NGINX alongside Traefik (both can coexist)
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
-```
-
-No change to `storage.storageClassName` is needed — the default `local-path` matches K3s's built-in provisioner.
-
-**OS requirements for K3s nodes:**
-- Linux: Ubuntu 20.04+, Debian 11+, RHEL/Rocky/AlmaLinux 8+, or any distro [supported by K3s](https://docs.k3s.io/installation/requirements)
-- Kernel ≥ 5.4
-- Ports 6443 (API), 80 and 443 (ingress) open
-- No separate container runtime installation needed
-
-**Minimum node sizing:** 4 vCPU, 16 GiB RAM, 100 GiB disk for a single-node production deployment.
-
-#### GKE, AKS, EKS (managed Kubernetes)
-
-The node OS is fully managed by the cloud provider. You only need to manage cluster version (≥ 1.25), node pool sizing, and cluster access credentials.
-
-Two add-ons are required before installing the chart:
-
-**1 — NGINX Ingress Controller** (same on all three platforms):
-
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
-```
-
-**2 — Set `storage.storageClassName`** to a StorageClass that exists in your cluster:
-
-| Platform | Recommended StorageClass | Notes |
-|---|---|---|
-| GKE | `premium-rwo` | SSD-backed; use `standard-rwo` for HDD |
-| AKS | `managed-premium` | SSD-backed; use `default` for HDD |
-| EKS | `gp3` | Requires EBS CSI driver add-on; `gp2` works on older clusters |
-
-```yaml
-# In your values file:
-storage:
-  storageClassName: gp3   # or premium-rwo, managed-premium, etc.
-```
-
-For EKS, ensure the **EBS CSI driver** add-on is enabled in your cluster before installing, or the `gp3` StorageClass won't be available.
-
-**Optional but commonly used on managed K8s:**
-
-- cert-manager — all three platforms have native certificate options, but the chart's cert-manager annotation (`cert-manager.io/cluster-issuer`) won't work without it
-- External Secrets Operator — integrates natively with AWS Secrets Manager, GCP Secret Manager, and Azure Key Vault via `secrets.mode: externalSecrets`
-
----
-
-## Chart overview
-
-The `plextrac` chart deploys the full PlexTrac platform as a set of Kubernetes workloads:
+### What the chart deploys
 
 | Workload | Kind | Default replicas |
 |---|---|---|
@@ -125,201 +45,369 @@ The `plextrac` chart deploys the full PlexTrac platform as a set of Kubernetes w
 | minio-bootstrap | Job | — |
 | migrations-and-etl | Job | — |
 
-Chart defaults use public DockerHub images, `secrets.mode: manual` with `createKubernetesSecrets: true`, and auto-generate any secrets not explicitly provided. This means a standard install produces a working deployment without requiring any external secrets infrastructure.
+**Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
+
+### Software requirements
+
+| Tool | Minimum version |
+|---|---|
+| Kubernetes | 1.25 |
+| Helm | 3.10 |
+| NGINX Ingress Controller | any current release |
+
+> All Ingress resources use `ingressClassName: nginx`. Other ingress controllers are not supported without changes to annotations and ingress class values.
+
+### What the chart auto-generates
+
+These secrets are generated automatically on first install and **preserved on every upgrade** — you do not need to provide them:
+
+- Database passwords (Couchbase, PostgreSQL)
+- Redis password
+- MinIO credentials
+- JWT signing keys
+- MFA and cookie encryption keys
+- Internal API keys
+
+**What you must provide yourself** is covered in [Phase 2](#phase-2--gather-credentials-and-secrets).
 
 ---
 
-## Installation
+## Phase 1 — Set up your cluster
 
-### Step 1 — Copy the starter values file
+Complete all steps in this phase before moving to Phase 2.
+
+### Step 1.1 — Provision a Kubernetes cluster
+
+#### K3s (recommended for self-hosted / on-prem)
+
+K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageClass. No extra OS packages or container runtime needed.
+
+**OS requirements:**
+- Linux: Ubuntu 20.04+, Debian 11+, RHEL/Rocky/AlmaLinux 8+
+- Kernel ≥ 5.4
+- Ports 6443 (API), 80 and 443 (ingress) open
+- **Minimum node sizing:** 4 vCPU, 16 GiB RAM, 100 GiB disk
+
+```bash
+# Install K3s and disable the built-in Traefik ingress controller.
+# PlexTrac uses NGINX — running both causes conflicts.
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+
+# Copy kubeconfig so kubectl and helm can reach the cluster
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+
+# Confirm the node is Ready
+kubectl get nodes
+```
+
+#### GKE, AKS, EKS
+
+Use your cloud provider's console or CLI to create a cluster (Kubernetes ≥ 1.25). Configure `kubectl` access with your provider's standard flow (`gcloud container clusters get-credentials`, `az aks get-credentials`, `aws eks update-kubeconfig`).
+
+Set the storage class in your values file after cluster creation — see the table in [Reference: Storage configuration](#reference-storage-configuration).
+
+For EKS, enable the **EBS CSI driver** add-on before installing, or PVCs will not provision.
+
+---
+
+### Step 1.2 — Install NGINX Ingress Controller
+
+Run this on every platform (K3s, GKE, AKS, EKS):
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --wait
+```
+
+Confirm it is running:
+
+```bash
+kubectl -n ingress-nginx get pods
+kubectl -n ingress-nginx get svc ingress-nginx-controller
+```
+
+The `ingress-nginx-controller` Service will have an `EXTERNAL-IP` once the LoadBalancer is provisioned. **Note this IP — you need it for DNS in the next step.**
+
+---
+
+### Step 1.3 — Create a DNS record
+
+Create an A record pointing your chosen hostname to the ingress LoadBalancer IP:
+
+```
+plextrac.mycompany.com  →  <EXTERNAL-IP from Step 1.2>
+```
+
+For local/lab installs without DNS, add an entry to `/etc/hosts` on any machine that needs to reach PlexTrac:
+
+```
+<EXTERNAL-IP>  plextrac.mycompany.com
+```
+
+> DNS propagation can take minutes to hours depending on your provider. You can proceed with configuration while waiting, but the final smoke test requires DNS to resolve.
+
+---
+
+## Phase 2 — Gather credentials and secrets
+
+**Do not run `helm install` until you have completed this phase.**
+
+Copy `.env.example` from the repo root and fill it in:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local — it annotates which my-values.yaml field each variable maps to
+```
+
+### 2.1 — Required: domain
+
+| What | Where it goes |
+|---|---|
+| Your hostname (from Step 1.3) | `global.ingress.host` |
+| Admin notification email (optional) | `secrets.manual.generatedSecrets.application.stringData.ADMIN_EMAIL` |
+
+### 2.2 — Docker registry credentials
+
+#### Public images (most installs)
+
+PlexTrac images on DockerHub (`plextrac/*`) are public. No credentials are needed for them. Skip to 2.3 unless:
+- You use a **private registry mirror** that requires authentication, or
+- You pull the **CKEditor image** from `docker.cke-cs.com` (requires a CKEditor license-tied account)
+
+#### Private registry or CKEditor
+
+Generate the `dockerconfigjson` blob that Kubernetes needs:
+
+```bash
+kubectl create secret docker-registry tmp \
+  --docker-server=<registry>      \
+  --docker-username=<username>    \
+  --docker-password=<password>    \
+  --dry-run=client -o json \
+  | jq -r '.data[".dockerconfigjson"]' \
+  | base64 -d
+```
+
+This prints a JSON string. Paste it into your values file — see [Reference: Image overrides — imagePullSecrets](#using-a-private-registry-imagepullsecrets) for the exact values structure.
+
+> **Security note:** The `dockerconfigjson` blob is base64-encoded (not encrypted). Store your values file like a credential, or provide it via a separate file excluded from version control.
+
+#### CKEditor-specific credentials
+
+If using `docker.cke-cs.com`, run the command above with:
+- `--docker-server=docker.cke-cs.com`
+- Credentials from your CKEditor account dashboard
+
+You will need **two** `imagePullSecrets` entries if pulling from both DockerHub-equivalent and CKEditor registries.
+
+### 2.3 — Optional integrations
+
+These can be left blank — the chart installs without them. Add them any time via `helm upgrade`.
+
+| Key | Purpose |
+|---|---|
+| `CKEDITOR_SERVER_LICENSE_KEY` | Enables collaborative editing features |
+| `LAUNCH_DARKLY_SDK_KEY` | Feature flag service |
+| `PENDO_API_KEY` | Product analytics |
+| `SENTRY_DSN_BACKEND` | Error tracking |
+
+### 2.4 — TLS strategy
+
+Decide which TLS option you will use before configuring values. Full details are in [Reference: TLS configuration](#reference-tls-configuration).
+
+| Option | Best for | Requires |
+|---|---|---|
+| cert-manager (recommended) | Any public-facing install | cert-manager installed, DNS resolving |
+| Pre-create TLS secret | Bring-your-own certs | Your PEM files |
+| Inline cert in values | Lab/testing only | Your PEM files (ends up in Helm history) |
+| No TLS | Dev/testing only | Nothing |
+
+If using cert-manager, install it now:
+
+```bash
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm upgrade --install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true \
+  --wait
+```
+
+Then create a `ClusterIssuer` for Let's Encrypt:
+
+```yaml
+# letsencrypt-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@mycompany.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+```
+
+```bash
+kubectl apply -f letsencrypt-issuer.yaml
+```
+
+---
+
+## Phase 3 — Configure your values file
 
 ```bash
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
 ```
 
-This file is the recommended starting point for self-hosted deployments. All comments explain what each field does.
-
-### Step 2 — Set required values
-
-Open `my-values.yaml` and set at minimum:
+Edit `my-values.yaml`. At minimum, set these fields using the values you gathered in Phase 2:
 
 ```yaml
 global:
   ingress:
-    host: plextrac.mycompany.com   # Your domain
+    host: plextrac.mycompany.com              # from Step 1.3
+    tlsSecretName: plextrac-com-tls
+    certManagerClusterIssuer: letsencrypt-prod  # or "" if not using cert-manager
 
 secrets:
+  mode: manual
   manual:
+    createKubernetesSecrets: true
     generatedSecrets:
       application:
         stringData:
-          ADMIN_EMAIL: admin@mycompany.com   # Initial admin account email
+          ADMIN_EMAIL: ""                       # optional: admin notification email
+      shared:
+        stringData:
+          CKEDITOR_SERVER_LICENSE_KEY: ""     # from Step 2.3 — leave blank to disable
+          LAUNCH_DARKLY_SDK_KEY: ""
+          PENDO_API_KEY: ""
+          SENTRY_DSN_BACKEND: ""
+      tls:
+        enabled: false                        # set to true if providing cert inline
 ```
 
-If you have a CKEditor license, also set:
+If you need Docker registry credentials (from Step 2.2), also add:
 
 ```yaml
+global:
+  imagePullSecrets:
+    - name: regcred
+
 secrets:
   manual:
     generatedSecrets:
-      shared:
-        stringData:
-          CKEDITOR_SERVER_LICENSE_KEY: "your-license-key"
+      registryCredentials:
+        enabled: true
+        name: regcred
+        dockerconfigjson: '<paste your dockerconfigjson blob here>'
 ```
 
-### Step 3 — Install
-
-```bash
-helm upgrade --install plextrac ./charts/plextrac \
-  -f my-values.yaml \
-  --namespace plextrac \
-  --create-namespace
-```
-
-`helm upgrade --install` is idempotent — it installs on first run and upgrades on subsequent runs. You can safely re-run the same command to apply configuration changes.
-
----
-
-## Setting the ingress hostname
-
-The ingress hostname controls how PlexTrac is exposed externally. It is templated into:
-
-- All four `Ingress` resources (nginx, CKEditor, GraphQL, MinIO)
-- The `CLIENT_DOMAIN_NAME` key in the `env-config` ConfigMap, which is read by the backend API and nginx
-
-### In your values file
-
-```yaml
-global:
-  ingress:
-    host: plextrac.mycompany.com
-```
-
-### As a `--set` flag
-
-```bash
-helm upgrade --install plextrac ./charts/plextrac \
-  -f my-values.yaml \
-  --set global.ingress.host=plextrac.mycompany.com
-```
-
-### Changing the hostname after install
-
-Update the value and re-run `helm upgrade`. The ConfigMap and all Ingress objects are updated in place:
-
-```bash
-helm upgrade plextrac ./charts/plextrac \
-  -f my-values.yaml \
-  --set global.ingress.host=new-hostname.mycompany.com
-```
-
-> **Note:** Changing the hostname does not restart pods automatically. After the upgrade completes, restart the nginx and API pods to pick up the new `CLIENT_DOMAIN_NAME`:
-> ```bash
-> kubectl -n plextrac rollout restart deployment/plextracnginx deployment/plextracapi
-> ```
-
----
-
-## Overriding values
-
-Helm provides several ways to override default values. They can be combined and the last value wins when the same key appears multiple times.
-
-### Method 1 — Values file (`-f`)
-
-The recommended approach. Create a file with only the values you want to change:
-
-```yaml
-# my-values.yaml
-global:
-  ingress:
-    host: plextrac.mycompany.com
-
-replicaCounts:
-  plextracapi: 5
-```
-
-```bash
-helm upgrade --install plextrac ./charts/plextrac -f my-values.yaml
-```
-
-You can layer multiple files. They are applied left to right, with later files taking precedence:
-
-```bash
-helm upgrade --install plextrac ./charts/plextrac \
-  -f charts/plextrac/examples/values-self-hosted.yaml \
-  -f my-overrides.yaml
-```
-
-### Method 2 — Inline `--set`
-
-For single values, especially in CI pipelines or quick tests:
-
-```bash
-helm upgrade --install plextrac ./charts/plextrac \
-  -f my-values.yaml \
-  --set global.ingress.host=plextrac.mycompany.com \
-  --set replicaCounts.plextracapi=5
-```
-
-For nested keys, use dot notation. For array values, use index notation:
-
-```bash
-# Set a nested value
---set secrets.manual.createKubernetesSecrets=true
-
-# Set an array element (e.g., imagePullSecrets)
---set 'global.imagePullSecrets[0].name=my-registry-secret'
-```
-
-### Method 3 — `--set-string`
-
-Forces the value to be treated as a string, which is useful for values that look like numbers or booleans:
-
-```bash
---set-string images.plextracdb.tag=6.5.1
-```
-
-### Precedence order (lowest to highest)
-
-1. `charts/plextrac/values.yaml` (chart defaults)
-2. `-f file1.yaml`
-3. `-f file2.yaml` (overwrites file1 for same keys)
-4. `--set` / `--set-string` flags
-
-### Previewing the rendered output
-
-Before applying changes, see exactly what Helm will generate:
+Preview the rendered output before installing to catch errors early:
 
 ```bash
 helm template plextrac ./charts/plextrac -f my-values.yaml | less
 ```
 
-To filter for a specific resource:
+---
+
+## Phase 4 — Install
 
 ```bash
-helm template plextrac ./charts/plextrac -f my-values.yaml \
-  | grep -A 30 "name: env-config"
+helm upgrade --install plextrac ./charts/plextrac \
+  --namespace plextrac \
+  --create-namespace \
+  -f my-values.yaml \
+  --wait \
+  --timeout 10m
 ```
 
-### Viewing current values on a live release
+`--wait` blocks until all pods are healthy or the timeout is reached. Check progress in another terminal:
 
 ```bash
-# Values you supplied (user-supplied only)
-helm get values plextrac -n plextrac
-
-# All values including chart defaults
-helm get values plextrac -n plextrac --all
+kubectl -n plextrac get pods -w
 ```
+
+Normal startup order: `plextracdb` → `postgres` → `redis` → `minio` → `migrations-and-etl` (Job) → `plextracapi` → everything else.
+
+### Uninstalling
+
+```bash
+# Check the release name first
+helm list --namespace plextrac
+
+# Uninstall
+helm uninstall plextrac --namespace plextrac
+```
+
+> `helm uninstall` removes all Kubernetes resources created by the chart but **does not delete PersistentVolumeClaims**. Delete them manually if you want full cleanup:
+> ```bash
+> kubectl -n plextrac delete pvc --all
+> ```
 
 ---
 
-## Secrets configuration
+## Phase 5 — Verify
+
+### Check release status
+
+```bash
+helm status plextrac -n plextrac
+```
+
+### Check pods
+
+```bash
+kubectl -n plextrac get pods
+```
+
+All pods should reach `Running` or `Completed` status.
+
+### Check secrets were created
+
+```bash
+kubectl -n plextrac get secrets
+```
+
+You should see at minimum `application-secrets` and `shared-secrets`.
+
+### Check ingress
+
+```bash
+kubectl -n plextrac get ingress
+```
+
+The `ADDRESS` field is populated once the ingress controller assigns an IP.
+
+### Smoke test
+
+```bash
+curl -I https://plextrac.mycompany.com/api/v2/health/full
+```
+
+Expected: `HTTP/2 200`
+
+---
+
+## Reference: Secrets configuration
 
 The chart supports three secrets modes. Set `secrets.mode` to choose one.
 
 ### Manual mode (default — recommended for self-hosted)
 
-The chart auto-generates all required secrets on first install and preserves existing values on upgrade. You only need to provide values that can't be auto-generated (like email addresses and license keys).
+The chart auto-generates all required secrets on first install and preserves values on upgrade. You only need to provide values that cannot be auto-generated.
 
 ```yaml
 secrets:
@@ -329,34 +417,17 @@ secrets:
     generatedSecrets:
       application:
         stringData:
-          ADMIN_EMAIL: admin@mycompany.com
+          ADMIN_EMAIL: ""   # optional
       shared:
         stringData:
           CKEDITOR_SERVER_LICENSE_KEY: "your-key"
 ```
 
 **How auto-generation works:**
-- On install: any required key not present in `stringData` or `data` is filled with a random 40-character alphanumeric value
+- On install: any required key not in `stringData` or `data` gets a random 40-character alphanumeric value
 - On upgrade: Helm looks up the existing secret in the cluster and reuses its current value — passwords are never rotated automatically
 
-**Providing your own values for auto-generated keys:**
-
-Any key in `stringData` takes precedence over auto-generation. To pin a specific password rather than letting the chart generate one:
-
-```yaml
-secrets:
-  manual:
-    generatedSecrets:
-      application:
-        stringData:
-          ADMIN_EMAIL: admin@mycompany.com
-          REDIS_PASSWORD: "my-specific-redis-password"
-          CB_ADMIN_PASS: "my-couchbase-admin-password"
-```
-
-**Static username/database defaults:**
-
-The following keys have static defaults (matching the `docker-compose.yml` reference deployment) and are pre-populated in `stringData`. You can override any of them:
+**Static username/database defaults (matching the `docker-compose.yml` reference deployment):**
 
 | Key | Default |
 |---|---|
@@ -372,9 +443,11 @@ The following keys have static defaults (matching the `docker-compose.yml` refer
 | `MINIO_ROOT_USER` | `admin` |
 | `MINIO_LOCAL_USER` | `localadmin` |
 
+Any of these can be overridden by adding the key to `stringData`.
+
 ### External Secrets Operator mode
 
-Use when you have ESO installed and a `ClusterSecretStore` connected to your secret backend (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault, etc.).
+Use when ESO is installed and a `ClusterSecretStore` is connected to your secret backend.
 
 ```yaml
 secrets:
@@ -424,32 +497,35 @@ For full details on all three modes, see [docs/runbooks/secrets-modes.md](runboo
 
 ---
 
-## Storage configuration
+## Reference: Storage configuration
 
-The chart creates 7 PersistentVolumeClaims. The StorageClass used for all of them is controlled by a single value:
+The chart creates 7 PersistentVolumeClaims. All use a single StorageClass:
 
 ```yaml
 storage:
-  storageClassName: local-path   # default — matches K3s built-in provisioner
+  storageClassName: local-path   # default — K3s built-in provisioner
 ```
 
-Change this to match the StorageClass available in your cluster. See [platform-specific prerequisites](#platform-specific-prerequisites) for the right value per platform.
+| Platform | Recommended StorageClass | Notes |
+|---|---|---|
+| K3s | `local-path` | Built-in, no change needed |
+| GKE | `premium-rwo` | SSD-backed; use `standard-rwo` for HDD |
+| AKS | `managed-premium` | SSD-backed; use `default` for HDD |
+| EKS | `gp3` | Requires EBS CSI driver add-on |
 
-To see what StorageClasses are available in your cluster:
+Check what StorageClasses are available:
 
 ```bash
 kubectl get storageclass
 ```
 
-> **Note:** Changing `storage.storageClassName` after initial install does **not** migrate existing PVCs. PVCs are immutable after creation. If you need to change the StorageClass on an existing deployment, you must back up data, delete and recreate the PVCs, and restore. For this reason, set the correct StorageClass before first install.
+> **Important:** Set `storage.storageClassName` **before first install**. Changing it after the initial install does not migrate existing PVCs — PVCs are immutable after creation. Migration requires backing up data, deleting and recreating PVCs, and restoring.
 
 ---
 
-## TLS configuration
+## Reference: TLS configuration
 
 ### Option A — cert-manager (recommended)
-
-If cert-manager is installed, set your `ClusterIssuer` name. The chart's Ingress resources include the appropriate annotation and the TLS stanza is populated automatically.
 
 ```yaml
 global:
@@ -459,9 +535,28 @@ global:
     certManagerClusterIssuer: letsencrypt-prod
 ```
 
-### Option B — Provide your own certificate via Helm
+### Option B — Pre-create the TLS secret
 
-Set the TLS secret values directly. The chart creates the `kubernetes.io/tls` Secret from the provided PEM content:
+Create the secret before installing, then reference it by name:
+
+```bash
+kubectl -n plextrac create secret tls plextrac-com-tls \
+  --cert=./fullchain.pem \
+  --key=./privkey.pem
+```
+
+```yaml
+global:
+  ingress:
+    tlsSecretName: plextrac-com-tls
+secrets:
+  manual:
+    generatedSecrets:
+      tls:
+        enabled: false
+```
+
+### Option C — Inline certificate in values
 
 ```yaml
 secrets:
@@ -478,40 +573,17 @@ secrets:
           ...
 ```
 
-> **Security note:** Storing certificates in a values file means they end up in Helm release history. If this is a concern, use cert-manager or manage the TLS secret externally (create it with `kubectl` before installing) and set `tls.enabled: false`.
+> **Security note:** Certificates stored inline end up in Helm release history. Use cert-manager or pre-create the secret if this is a concern.
 
-### Option C — Pre-create the TLS secret manually
+### Option D — No TLS (dev/testing only)
 
-Create the secret before installing, and reference it by name:
-
-```bash
-kubectl -n plextrac create secret tls plextrac-com-tls \
-  --cert=./fullchain.pem \
-  --key=./privkey.pem
-```
-
-Then in your values:
-
-```yaml
-global:
-  ingress:
-    tlsSecretName: plextrac-com-tls
-secrets:
-  manual:
-    generatedSecrets:
-      tls:
-        enabled: false   # Chart won't try to create it
-```
-
-### Option D — No TLS (development/testing only)
-
-Leave `certManagerClusterIssuer` empty and `tls.enabled: false`. The Ingress objects are still created; traffic arrives unencrypted.
+Leave `certManagerClusterIssuer` blank and `tls.enabled: false`.
 
 ---
 
-## Image overrides
+## Reference: Image overrides
 
-All images are configurable. The defaults point to public DockerHub repositories.
+All images are configurable. Defaults point to public DockerHub repositories.
 
 ### Pinning a specific version
 
@@ -524,8 +596,6 @@ images:
 ```
 
 ### Using a private registry mirror
-
-If you pull images through an internal mirror or proxy, override the repository for each image:
 
 ```yaml
 images:
@@ -560,56 +630,27 @@ images:
 
 ### Using a private registry (imagePullSecrets)
 
-If your registry requires authentication, every workload needs an `imagePullSecrets` reference pointing to a `kubernetes.io/dockerconfigjson` Secret. The chart wires this up automatically — you just have to make the Secret exist and tell the chart its name via `global.imagePullSecrets`.
+Every Deployment, StatefulSet, and Job will pick up `global.imagePullSecrets` automatically. Three ways to provide the Secret:
 
-There are three ways to provide the Secret. Pick the one that matches your secrets workflow.
-
-#### Option 1 — Let the chart create the Secret from values (simplest)
-
-Use this when you're already using `secrets.mode: manual` (the default). The chart will create a `kubernetes.io/dockerconfigjson` Secret in the release namespace from a `dockerconfigjson` blob you supply in your values file.
-
-**Step 1 — generate the dockerconfigjson blob.** The easiest way is to have `kubectl` build it for you and print the contents:
-
-```bash
-kubectl create secret docker-registry tmp \
-  --docker-server=registry.mycompany.com \
-  --docker-username=myuser \
-  --docker-password=mypassword \
-  --dry-run=client -o json \
-  | jq -r '.data[".dockerconfigjson"]' \
-  | base64 -d
-```
-
-This prints a single-line JSON blob that looks like:
-
-```json
-{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}
-```
-
-**Step 2 — paste it into your values file:**
+#### Option 1 — Let the chart create the Secret (simplest)
 
 ```yaml
+global:
+  imagePullSecrets:
+    - name: regcred
+
 secrets:
-  mode: manual
   manual:
     generatedSecrets:
       registryCredentials:
         enabled: true
-        name: regcred-dorf
+        name: regcred
         dockerconfigjson: '{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}'
-
-global:
-  imagePullSecrets:
-    - name: regcred-dorf   # must match the name above
 ```
 
-**Step 3 — install or upgrade as usual.** The chart creates the Secret and every Deployment / StatefulSet / Job picks it up.
+Generate the `dockerconfigjson` blob (see [Phase 2.2](#22--docker-registry-credentials)).
 
-> **Security note:** The `dockerconfigjson` value contains a base64-encoded (not encrypted) password and ends up in Helm release history. Treat your values file like a credential. If this is a concern, use Option 2 or Option 3 instead, or keep registry creds in a separate values file (`-f secrets-overrides.yaml`) that is excluded from version control.
-
-#### Option 2 — Pre-create the Secret with `kubectl`
-
-Use this when you'd rather keep registry credentials out of values files entirely.
+#### Option 2 — Pre-create the secret with `kubectl`
 
 ```bash
 kubectl -n plextrac create secret docker-registry my-registry-creds \
@@ -618,8 +659,6 @@ kubectl -n plextrac create secret docker-registry my-registry-creds \
   --docker-password=mypassword
 ```
 
-Then in your values, just point at it by name:
-
 ```yaml
 global:
   imagePullSecrets:
@@ -629,79 +668,42 @@ secrets:
   manual:
     generatedSecrets:
       registryCredentials:
-        enabled: false   # chart won't try to create it
+        enabled: false
 ```
 
-You can list multiple if you pull from more than one registry:
-
-```yaml
-global:
-  imagePullSecrets:
-    - name: my-registry-creds
-    - name: ckeditor-registry-creds
-```
-
-#### Option 3 — Sync the Secret from External Secrets Operator
-
-Use this when you're already running ESO and storing registry credentials in AWS Secrets Manager / GCP Secret Manager / Vault / etc. The chart includes an `ExternalSecret` template that pulls a `dockerconfigjson` value from your secret store and materializes it as a `kubernetes.io/dockerconfigjson` Secret.
-
-The remote secret value must already be a valid dockerconfigjson string (build it the same way as Step 1 of Option 1, then store the JSON blob in your secret backend).
+#### Option 3 — Sync via External Secrets Operator
 
 ```yaml
 secrets:
   mode: externalSecrets
   externalSecrets:
-    refreshInterval: 1h
-    secretStoreRef:
-      kind: ClusterSecretStore
-      name: my-cluster-secret-store
     registryCredentials:
       enabled: true
-      targetSecretName: regcred-dorf
-      remoteKey: plextrac/registry-credentials   # key in your secret backend
+      targetSecretName: regcred
+      remoteKey: plextrac/registry-credentials
 
 global:
   imagePullSecrets:
-    - name: regcred-dorf   # must match targetSecretName above
+    - name: regcred
 ```
-
-#### Verification
-
-After installing, confirm the secret is attached to a pod:
-
-```bash
-kubectl -n plextrac get pod <pod-name> -o jsonpath='{.spec.imagePullSecrets}'
-```
-
-If you see `ImagePullBackOff` on a pod, describe it to see the registry response:
-
-```bash
-kubectl -n plextrac describe pod <pod-name> | grep -A 5 Events
-```
-
-Common causes: the secret name in `global.imagePullSecrets` doesn't match the Secret that was created, the credentials are wrong, or the image repository overrides under `images:` still point at the public DockerHub path instead of your private registry.
-
-Leave `global.imagePullSecrets` empty (`[]`) when using public images.
 
 ---
 
-## Replica counts
-
-Control the number of replicas for each scalable service:
+## Reference: Replica counts
 
 ```yaml
 replicaCounts:
-  plextracapi: 3              # Core API — increase for higher throughput
-  ckeditor: 3                 # CKEditor backend
-  eventOrchestrator: 1        # Must be 1 (not horizontally scalable)
-  notificationEngine: 1       # Must be 1 (not horizontally scalable)
-  notificationSender: 1       # Must be 1 (not horizontally scalable)
+  plextracapi: 3              # Core API — scale for throughput
+  ckeditor: 3
+  eventOrchestrator: 1        # Must be 1 — not horizontally scalable
+  notificationEngine: 1       # Must be 1 — not horizontally scalable
+  notificationSender: 1       # Must be 1 — not horizontally scalable
   integrationWorker: 1
   contextualScoringService: 1
-  datalakeMaintainer: 0       # Disabled by default — set to 1 to enable
+  datalakeMaintainer: 0       # Disabled by default; set to 1 to enable
 ```
 
-For minimal resource usage (development/staging):
+Minimal footprint for dev/staging:
 
 ```yaml
 replicaCounts:
@@ -717,9 +719,70 @@ replicaCounts:
 
 ---
 
-## Upgrading
+## Reference: Overriding values
 
-Upgrades use the same command as install:
+### Values file (`-f`)
+
+```bash
+helm upgrade --install plextrac ./charts/plextrac -f my-values.yaml
+```
+
+Layer multiple files (later files take precedence):
+
+```bash
+helm upgrade --install plextrac ./charts/plextrac \
+  -f charts/plextrac/examples/values-self-hosted.yaml \
+  -f my-overrides.yaml
+```
+
+### Inline `--set`
+
+```bash
+helm upgrade --install plextrac ./charts/plextrac \
+  -f my-values.yaml \
+  --set global.ingress.host=plextrac.mycompany.com \
+  --set replicaCounts.plextracapi=5
+```
+
+### `--set-string`
+
+Forces the value to be treated as a string:
+
+```bash
+--set-string images.plextracdb.tag=6.5.1
+```
+
+### Precedence order (lowest to highest)
+
+1. `charts/plextrac/values.yaml` (chart defaults)
+2. `-f file1.yaml`
+3. `-f file2.yaml`
+4. `--set` / `--set-string`
+
+### Viewing current values on a live release
+
+```bash
+helm get values plextrac -n plextrac          # user-supplied values
+helm get values plextrac -n plextrac --all    # all values including defaults
+```
+
+### Setting the ingress hostname after install
+
+```bash
+helm upgrade plextrac ./charts/plextrac \
+  -f my-values.yaml \
+  --set global.ingress.host=new-hostname.mycompany.com
+```
+
+Then restart the pods that read `CLIENT_DOMAIN_NAME`:
+
+```bash
+kubectl -n plextrac rollout restart deployment/plextracnginx deployment/plextracapi
+```
+
+---
+
+## Upgrading
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -728,79 +791,24 @@ helm upgrade --install plextrac ./charts/plextrac \
 ```
 
 **What happens during upgrade:**
+- Deployments and StatefulSets with changed specs are updated with rolling-update strategy
+- The `migrations-and-etl` and `bootstrap-minio` Jobs are deleted and recreated (required because `Job.spec.template` is immutable)
+- Secrets in manual mode are preserved — the chart looks up existing values and reuses them for any key not explicitly set in `stringData`
 
-- Deployments and StatefulSets with changed specs are updated with the configured rolling-update strategy
-- The `migrations-and-etl` and `bootstrap-minio` Jobs are managed as Helm hooks (`post-install,post-upgrade` with `before-hook-creation` delete policy). Helm deletes the previous Job and creates a fresh one on every `helm upgrade`, which is required because `Job.spec.template` is immutable
-- Secrets in `manual` mode are preserved: the chart looks up existing secret values and reuses them for any key not explicitly set in `stringData`
-
-**Checking what would change before applying:**
+**Preview changes before applying:**
 
 ```bash
 helm diff upgrade plextrac ./charts/plextrac -f my-values.yaml -n plextrac
 ```
 
-`helm diff` is a plugin. Install it with `helm plugin install https://github.com/databus23/helm-diff` if not already present.
+(`helm diff` is a plugin — install with `helm plugin install https://github.com/databus23/helm-diff`)
 
 **Rolling back:**
 
 ```bash
-# List available revisions
 helm history plextrac -n plextrac
-
-# Roll back to a previous revision
 helm rollback plextrac <revision-number> -n plextrac
 ```
-
----
-
-## Verifying the installation
-
-### Check Helm release status
-
-```bash
-helm status plextrac -n plextrac
-```
-
-### Check that all pods are running
-
-```bash
-kubectl -n plextrac get pods
-```
-
-All pods should reach `Running` or `Completed` state. Common startup order: plextracdb → postgres → redis → minio → migrations-and-etl → plextracapi → everything else.
-
-### Check secrets are present
-
-```bash
-kubectl -n plextrac get secrets
-```
-
-In manual mode you should see at minimum:
-- `application-secrets`
-- `shared-secrets`
-
-### Check ingress
-
-```bash
-kubectl -n plextrac get ingress
-```
-
-The `ADDRESS` field should be populated with your ingress controller's IP once DNS propagates.
-
-### Check logs for a specific service
-
-```bash
-kubectl -n plextrac logs deployment/plextracapi --tail=50
-kubectl -n plextrac logs deployment/plextracnginx --tail=50
-```
-
-### Quick end-to-end smoke test
-
-```bash
-curl -I https://plextrac.mycompany.com/api/v2/health/full
-```
-
-Expected response: `HTTP/2 200`
 
 ---
 
@@ -808,24 +816,17 @@ Expected response: `HTTP/2 200`
 
 ### Pods stuck in `Pending`
 
-Usually a PVC issue. Check:
+Usually a PVC issue:
 
 ```bash
 kubectl -n plextrac get pvc
 kubectl -n plextrac describe pvc <pvc-name>
-```
-
-Pending PVCs mean no StorageClass can fulfill the claim. Verify your cluster has a StorageClass matching `storage.storageClassName` (default: `local-path`):
-
-```bash
 kubectl get storageclass
 ```
 
-If the StorageClass doesn't exist, set `storage.storageClassName` to one that does. See [Storage configuration](#storage-configuration) and [platform-specific prerequisites](#platform-specific-prerequisites).
+If the StorageClass doesn't exist, set `storage.storageClassName` to one that does. See [Reference: Storage configuration](#reference-storage-configuration).
 
 ### Pods stuck in `Init:Error` or `Init:CrashLoopBackOff`
-
-Check init container logs:
 
 ```bash
 kubectl -n plextrac logs <pod-name> -c <init-container-name>
@@ -833,26 +834,35 @@ kubectl -n plextrac logs <pod-name> -c <init-container-name>
 
 ### Pods stuck in `CrashLoopBackOff`
 
-Fetch logs including previous container run:
-
 ```bash
 kubectl -n plextrac logs <pod-name> --previous
 ```
 
 ### `application-secrets` or `shared-secrets` not found
 
-In manual mode with `createKubernetesSecrets: true`, secrets are created by the Helm release. If they're missing, check that the release completed without errors:
+In manual mode with `createKubernetesSecrets: true`, secrets are created by the Helm release:
 
 ```bash
 helm status plextrac -n plextrac
 helm get manifest plextrac -n plextrac | grep "kind: Secret"
 ```
 
-If using `createKubernetesSecrets: false`, you must create the secrets manually before installing. See [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
+If using `createKubernetesSecrets: false`, you must create the secrets before installing.
 
-### `Error: INSTALLATION FAILED: values don't meet the specifications of the schema`
+### `admission webhook denied: snippet directives are disabled`
 
-Your values file has a type or structure error. The error message includes the specific field. Check it against `charts/plextrac/values.schema.json` or run:
+Your cluster's ingress-nginx has snippet annotations disabled. The chart does not use `configuration-snippet` annotations — if you see this, you may be on an older version of the chart. Update to the latest chart version.
+
+If you need to enable snippets for other reasons:
+
+```bash
+kubectl patch configmap ingress-nginx-controller \
+  -n ingress-nginx \
+  --type merge \
+  -p '{"data":{"allow-snippet-annotations":"true"}}'
+```
+
+### `Error: values don't meet the specifications of the schema`
 
 ```bash
 helm lint ./charts/plextrac -f my-values.yaml
@@ -860,25 +870,23 @@ helm lint ./charts/plextrac -f my-values.yaml
 
 ### Ingress not routing traffic
 
-1. Confirm the ingress controller is running: `kubectl -n ingress-nginx get pods`
-2. Confirm the `ADDRESS` is set: `kubectl -n plextrac get ingress`
-3. Confirm DNS resolves to the ingress IP: `nslookup plextrac.mycompany.com`
-4. Check ingress controller logs: `kubectl -n ingress-nginx logs -l app.kubernetes.io/name=ingress-nginx --tail=100`
+```bash
+kubectl -n ingress-nginx get pods
+kubectl -n plextrac get ingress
+nslookup plextrac.mycompany.com
+kubectl -n ingress-nginx logs -l app.kubernetes.io/name=ingress-nginx --tail=100
+```
 
 ### PlexTrac API returns 502 Bad Gateway
 
-Nginx is up but cannot reach `plextracapi`. Check:
+nginx is up but cannot reach `plextracapi`. The API readiness probe is at `/api/v2/health/full` and fails if Couchbase, Redis, or Postgres are not ready:
 
 ```bash
 kubectl -n plextrac get pods -l app=plextracapi
 kubectl -n plextrac logs deployment/plextracapi --tail=100
 ```
 
-The API performs a readiness probe at `/api/v2/health/full`. If Couchbase, Redis, or Postgres are not ready, the probe will fail and the pod will not receive traffic.
-
-### Running `helm template` locally for debugging
-
-Render the full manifest without contacting the cluster:
+### Rendering templates locally for debugging
 
 ```bash
 helm template plextrac ./charts/plextrac \
@@ -886,8 +894,5 @@ helm template plextrac ./charts/plextrac \
   --set global.ingress.host=plextrac.mycompany.com \
   > rendered.yaml
 
-# Inspect a specific resource
 grep -A 50 "name: env-config" rendered.yaml
 ```
-
-This is also useful for validating your values file changes before a real upgrade.

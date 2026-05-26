@@ -2,25 +2,56 @@
 
 Helm chart for deploying the PlexTrac platform on Kubernetes. Supports self-hosted and on-premises deployments.
 
-## Quick start
+## Before you install
+
+A successful install requires three things to be in place **before** running `helm upgrade --install`:
+
+1. **A running Kubernetes cluster** with NGINX Ingress Controller installed
+2. **A DNS record** pointing your hostname to the ingress LoadBalancer IP
+3. **Your credentials gathered** — at minimum a domain name
+
+See [docs/user-guide.md](docs/user-guide.md) for the full phased installation guide.
+
+## Quick start (K3s)
 
 ```bash
-# 1. Copy the starter values file
+# 1. Install K3s (disable Traefik — PlexTrac uses NGINX)
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config
+
+# 2. Install NGINX Ingress Controller
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace --wait
+
+# 3. Get the ingress IP and create your DNS record (or /etc/hosts entry)
+kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+# 4. Fill in your credentials
+cp .env.example .env.local   # edit with your domain, email, and any Docker creds
+
+# 5. Configure your values file
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
+# Edit my-values.yaml — set global.ingress.host at minimum
 
-# 2. Set your domain and admin email
-#    Edit my-values.yaml:
-#      global.ingress.host: plextrac.mycompany.com
-#      secrets.manual.generatedSecrets.application.stringData.ADMIN_EMAIL: admin@mycompany.com
-
-# 3. Install
+# 6. Install
 helm upgrade --install plextrac ./charts/plextrac \
-  -f my-values.yaml \
   --namespace plextrac \
-  --create-namespace
+  --create-namespace \
+  -f my-values.yaml \
+  --wait --timeout 10m
+
+# 7. Verify
+curl -I https://plextrac.mycompany.com/api/v2/health/full
 ```
 
-See **[docs/user-guide.md](docs/user-guide.md)** for the complete installation and configuration guide.
+## Uninstalling
+
+```bash
+helm uninstall plextrac --namespace plextrac
+# PVCs are not deleted automatically — remove manually if you want full cleanup:
+kubectl -n plextrac delete pvc --all
+```
 
 ## Repository layout
 
@@ -29,7 +60,8 @@ See **[docs/user-guide.md](docs/user-guide.md)** for the complete installation a
 | `charts/plextrac/` | The PlexTrac Helm chart |
 | `charts/plextrac/values.yaml` | Default values |
 | `charts/plextrac/examples/` | Ready-to-use configuration examples |
-| `docs/user-guide.md` | Full usage guide (start here) |
+| `.env.example` | Pre-install checklist — credentials and settings to gather before installing |
+| `docs/user-guide.md` | Full phased installation and configuration guide |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
 | `docs/migration/` | Kustomize → Helm migration guides |
 | `.github/workflows/` | CI and release automation |

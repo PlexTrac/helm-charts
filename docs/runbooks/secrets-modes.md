@@ -2,9 +2,9 @@
 
 Use this guide to configure secrets for the `plextrac` chart across all supported `secrets.mode` values:
 
-- `externalSecrets` (default)
+- `manual` (default)
+- `externalSecrets`
 - `csi`
-- `manual`
 
 ## Secret types this chart expects
 
