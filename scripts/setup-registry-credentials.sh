@@ -6,7 +6,7 @@
 # snippet to paste in when using secrets.mode: manual.
 #
 # Usage:
-#   ./scripts/setup-registry-credentials.sh [--namespace <ns>] [--dry-run]
+#   ./scripts/setup-registry-credentials.sh [--namespace <ns>] [--release-name <name>] [--dry-run]
 #
 # Prerequisites: kubectl configured and pointing at your target cluster.
 # Fill in DOCKER_REGISTRY, DOCKER_USERNAME, DOCKER_PASSWORD in .env.local first.
@@ -14,15 +14,17 @@
 set -euo pipefail
 
 NAMESPACE="plextrac"
+RELEASE_NAME="plextrac"
 DRY_RUN=false
 ENV_FILE=".env.local"
 
 # ── Argument parsing ────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace|-n) NAMESPACE="$2"; shift 2 ;;
-    --dry-run)      DRY_RUN=true; shift ;;
-    --env-file)     ENV_FILE="$2"; shift 2 ;;
+    --namespace|-n)    NAMESPACE="$2"; shift 2 ;;
+    --release-name)    RELEASE_NAME="$2"; shift 2 ;;
+    --dry-run)         DRY_RUN=true; shift ;;
+    --env-file)        ENV_FILE="$2"; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -63,11 +65,20 @@ create_or_replace_secret() {
   echo "Secret '$name' applied in namespace '$NAMESPACE'."
 }
 
-# ── Ensure namespace exists ──────────────────────────────────────────────────
+# ── Ensure namespace exists with Helm ownership labels ───────────────────────
+# Labels and annotations allow `helm upgrade --install --create-namespace` to
+# adopt the namespace rather than rejecting it as unmanaged.
 if [[ "$DRY_RUN" == true ]]; then
-  echo "[dry-run] Would ensure namespace '$NAMESPACE' exists"
+  echo "[dry-run] Would ensure namespace '$NAMESPACE' exists with Helm labels"
 else
   kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl label namespace "$NAMESPACE" \
+    app.kubernetes.io/managed-by=Helm \
+    --overwrite
+  kubectl annotate namespace "$NAMESPACE" \
+    meta.helm.sh/release-name="$RELEASE_NAME" \
+    meta.helm.sh/release-namespace="$NAMESPACE" \
+    --overwrite
 fi
 
 # ── PlexTrac registry ────────────────────────────────────────────────────────
