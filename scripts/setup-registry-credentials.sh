@@ -62,6 +62,15 @@ create_or_replace_secret() {
     --namespace "$NAMESPACE" \
     --dry-run=client -o yaml \
     | kubectl apply -f -
+  kubectl label secret "$name" \
+    --namespace "$NAMESPACE" \
+    app.kubernetes.io/managed-by=Helm \
+    --overwrite
+  kubectl annotate secret "$name" \
+    --namespace "$NAMESPACE" \
+    meta.helm.sh/release-name="$RELEASE_NAME" \
+    meta.helm.sh/release-namespace="$NAMESPACE" \
+    --overwrite
   echo "Secret '$name' applied in namespace '$NAMESPACE'."
 }
 
