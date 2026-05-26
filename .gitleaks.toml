@@ -1,0 +1,34 @@
+title = "PlexTrac Helm Charts"
+
+[extend]
+  useDefault = true
+
+[allowlist]
+  description = "Safe patterns specific to this Helm chart repository"
+
+  # Files that contain structural definitions, not runtime secrets
+  paths = [
+    '''\.claude/''',
+    '''memory/''',
+    '''values\.schema\.json''',
+  ]
+
+  regexes = [
+    # Helm Go template expressions are structural, not secret values
+    '''\{\{[^}]*\}\}''',
+    # Kubernetes Secret *resource names* (not secret values)
+    '''(application|shared)-secrets''',
+    '''plextrac-com-tls''',
+    '''regcred-dorf''',
+    # Placeholder marker strings used in example files
+    '''(?i)placeholder_''',
+  ]
+
+  # Commit hashes for any known-safe historical commits that triggered a rule.
+  # Add entries here (with a comment explaining why) if gitleaks flags a commit
+  # that has already been reviewed and confirmed safe.
+  commits = [
+  "6fcb634702c0862ddffdf5d104ef40cf7082d0f7",
+  "267fdd1dac501d25f975814e039d27db53fd182f",
+
+]

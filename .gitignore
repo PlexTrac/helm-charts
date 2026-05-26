@@ -7,3 +7,5 @@ kubeconfig.yaml
 *.tgz
 values.local.yaml
 *.local.values.yaml
+gitleaks-*.sarif
+gitleaks-*.json
