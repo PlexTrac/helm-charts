@@ -54,7 +54,8 @@ create_or_replace_secret() {
     echo "[dry-run] Would create secret '$name' in namespace '$NAMESPACE'"
     return
   fi
-  kubectl create secret docker-registry "$name" \
+  kubectl create secret generic "$name" \
+    --type=kubernetes.io/dockerconfigjson \
     --from-literal=.dockerconfigjson="$json" \
     --namespace "$NAMESPACE" \
     --dry-run=client -o yaml \
