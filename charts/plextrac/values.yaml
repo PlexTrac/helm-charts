@@ -119,7 +119,7 @@ secrets:
           PG_CKEDITOR_RW_USER: ckeditor_rw
           MINIO_ROOT_USER: admin
           MINIO_LOCAL_USER: localadmin
-          ADMIN_EMAIL: ""   # Customer must provide
+          ADMIN_EMAIL: ""   # Optional: admin notification email
         data: {}
       shared:
         name: shared-secrets
