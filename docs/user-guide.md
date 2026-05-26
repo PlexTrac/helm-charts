@@ -162,8 +162,10 @@ Copy `.env.example` from the repo root and fill it in:
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local — it annotates which my-values.yaml field each variable maps to
+# Edit .env.local with your domain, credentials, and any optional integration keys
 ```
+
+`.env.local` is a reference document, not something Helm reads directly. Once you have filled it in, you will use it as a translation guide in [Phase 3](#phase-3--configure-your-values-file) — each variable includes a comment showing the exact `my-values.yaml` field it maps to.
 
 ### 2.1 — Required: domain
 
@@ -174,37 +176,24 @@ cp .env.example .env.local
 
 ### 2.2 — Docker registry credentials
 
-#### Public images (most installs)
-
-PlexTrac images on DockerHub (`plextrac/*`) are public. No credentials are needed for them. Skip to 2.3 unless:
-- You use a **private registry mirror** that requires authentication, or
-- You pull the **CKEditor image** from `docker.cke-cs.com` (requires a CKEditor license-tied account)
-
-#### Private registry or CKEditor
-
-Generate the `dockerconfigjson` blob that Kubernetes needs:
+PlexTrac images require authentication. Fill in your registry credentials in `.env.local`, then run the setup script — it creates the Kubernetes pull secrets and prints the `my-values.yaml` snippet to paste in:
 
 ```bash
-kubectl create secret docker-registry tmp \
-  --docker-server=<registry>      \
-  --docker-username=<username>    \
-  --docker-password=<password>    \
-  --dry-run=client -o json \
-  | jq -r '.data[".dockerconfigjson"]' \
-  | base64 -d
+# Fill in DOCKER_REGISTRY, DOCKER_USERNAME, DOCKER_PASSWORD in .env.local first
+./scripts/setup-registry-credentials.sh
 ```
 
-This prints a JSON string. Paste it into your values file — see [Reference: Image overrides — imagePullSecrets](#using-a-private-registry-imagepullsecrets) for the exact values structure.
+Options:
 
-> **Security note:** The `dockerconfigjson` blob is base64-encoded (not encrypted). Store your values file like a credential, or provide it via a separate file excluded from version control.
+```bash
+./scripts/setup-registry-credentials.sh --namespace plextrac   # default namespace
+./scripts/setup-registry-credentials.sh --dry-run              # preview without creating
+./scripts/setup-registry-credentials.sh --env-file /path/to/other.env
+```
 
-#### CKEditor-specific credentials
+The script creates `plextrac-registry-creds` (and `ckeditor-registry-creds` if CKEditor credentials are set), then prints the exact `global.imagePullSecrets` and `registryCredentials` block to add to `my-values.yaml`.
 
-If using `docker.cke-cs.com`, run the command above with:
-- `--docker-server=docker.cke-cs.com`
-- Credentials from your CKEditor account dashboard
-
-You will need **two** `imagePullSecrets` entries if pulling from both DockerHub-equivalent and CKEditor registries.
+> **Security note:** The `dockerconfigjson` blob is base64-encoded (not encrypted). Treat your values file like a credential, or supply registry creds via a separate `-f secrets.yaml` file excluded from version control.
 
 ### 2.3 — Optional integrations
 
@@ -267,6 +256,8 @@ kubectl apply -f letsencrypt-issuer.yaml
 ---
 
 ## Phase 3 — Configure your values file
+
+With your `.env.local` filled in, use it as a reference while editing your values file. Each variable in `.env.local` has a comment of the form `→ some.values.yaml.path` — those are the fields to set here.
 
 ```bash
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
@@ -583,7 +574,7 @@ Leave `certManagerClusterIssuer` blank and `tls.enabled: false`.
 
 ## Reference: Image overrides
 
-All images are configurable. Defaults point to public DockerHub repositories.
+All images are configurable. Defaults point to the PlexTrac registry — credentials are required to pull them.
 
 ### Pinning a specific version
 

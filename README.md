@@ -27,12 +27,14 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 # 3. Get the ingress IP and create your DNS record (or /etc/hosts entry)
 kubectl -n ingress-nginx get svc ingress-nginx-controller
 
-# 4. Fill in your credentials
-cp .env.example .env.local   # edit with your domain, email, and any Docker creds
+# 4. Fill in credentials and create registry pull secrets
+cp .env.example .env.local
+# Edit .env.local — set DOCKER_REGISTRY, DOCKER_USERNAME, DOCKER_PASSWORD at minimum
+./scripts/setup-registry-credentials.sh   # creates k8s secret + prints my-values.yaml snippet
 
 # 5. Configure your values file
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
-# Edit my-values.yaml — set global.ingress.host at minimum
+# Edit my-values.yaml — paste the snippet from step 4, set global.ingress.host
 
 # 6. Install
 helm upgrade --install plextrac ./charts/plextrac \
@@ -60,7 +62,8 @@ kubectl -n plextrac delete pvc --all
 | `charts/plextrac/` | The PlexTrac Helm chart |
 | `charts/plextrac/values.yaml` | Default values |
 | `charts/plextrac/examples/` | Ready-to-use configuration examples |
-| `.env.example` | Pre-install checklist — credentials and settings to gather before installing |
+| `.env.example` | Pre-install checklist — copy to `.env.local`, fill in, then run `scripts/setup-registry-credentials.sh` |
+| `scripts/` | Helper scripts — registry credential setup and other pre-install tasks |
 | `docs/user-guide.md` | Full phased installation and configuration guide |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
 | `docs/migration/` | Kustomize → Helm migration guides |
@@ -70,7 +73,7 @@ kubectl -n plextrac delete pvc --all
 
 | File | Use case |
 |---|---|
-| `examples/values-self-hosted.yaml` | Manual secrets, DockerHub images — recommended default |
+| `examples/values-self-hosted.yaml` | Manual secrets — recommended default |
 | `examples/values-external-secrets.yaml` | External Secrets Operator |
 | `examples/values-csi-aws.yaml` | CSI driver with AWS Secrets Manager |
 | `examples/values-csi-gcp.yaml` | CSI driver with GCP Secret Manager |

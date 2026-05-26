@@ -18,7 +18,7 @@ Regardless of mode, workloads expect these Kubernetes Secrets by name:
 Notes:
 
 - All workloads reference `application-secrets` and `shared-secrets` via `secretKeyRef`.
-- Image pull secrets are driven by `global.imagePullSecrets` and default to empty (DockerHub public images require no credentials).
+- Image pull secrets are driven by `global.imagePullSecrets`. PlexTrac images require authentication — you must configure a registry credential secret and reference it here before the chart can pull images.
 - TLS is represented as an `ExternalSecret` in `externalSecrets` mode, or a pre-created TLS secret in `manual`/CSI-backed setups.
 
 ## Common prerequisites
