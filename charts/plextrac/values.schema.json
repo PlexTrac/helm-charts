@@ -28,6 +28,13 @@
       },
       "required": ["namespace"]
     },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "storageClassName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["storageClassName"]
+    },
     "secrets": {
       "type": "object",
       "properties": {
