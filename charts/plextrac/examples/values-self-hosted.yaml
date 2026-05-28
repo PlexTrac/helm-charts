@@ -5,8 +5,11 @@
 global:
   namespace: plextrac
   createNamespace: true
-  imagePullSecrets: []   # Must reference a secret with credentials for registry.plextrac.com.
-                         # See docs/user-guide.md § Docker registry credentials for setup steps.
+  # Run scripts/setup-registry-credentials.sh to create the image pull secret, then
+  # reference it here. Leave empty only if all images are from public registries.
+  imagePullSecrets:
+    - name: plextrac-registry-creds
+    # - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
   ingress:
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls

@@ -2,13 +2,15 @@
 # setup-registry-credentials.sh
 #
 # Sources .env.local and creates Kubernetes image pull secrets for the PlexTrac
-# registry and (optionally) the CKEditor registry. Also prints the my-values.yaml
-# snippet to paste in when using secrets.mode: manual.
+# registry and (optionally) the CKEditor registry, then prints the
+# global.imagePullSecrets snippet to add to my-values.yaml.
 #
 # Usage:
 #   ./scripts/setup-registry-credentials.sh [--namespace <ns>] [--release-name <name>] [--dry-run]
 #
-# Prerequisites: kubectl configured and pointing at your target cluster.
+# Prerequisites:
+#   - kubectl configured and pointing at your target cluster
+#   - jq installed (used to safely build the dockerconfigjson blob)
 # Fill in DOCKER_REGISTRY, DOCKER_USERNAME, DOCKER_PASSWORD in .env.local first.
 
 set -euo pipefail
@@ -29,6 +31,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── Preflight checks ────────────────────────────────────────────────────────
+if ! command -v jq &>/dev/null; then
+  echo "ERROR: jq is required but not installed."
+  echo "       Install it (e.g. brew install jq) and retry."
+  exit 1
+fi
+
 # ── Load .env.local ─────────────────────────────────────────────────────────
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: $ENV_FILE not found."
@@ -46,8 +55,13 @@ make_dockerconfigjson() {
   local server="$1" user="$2" pass="$3"
   local auth
   auth=$(printf '%s:%s' "$user" "$pass" | base64 | tr -d '\n')
-  printf '{"auths":{"%s":{"username":"%s","password":"%s","auth":"%s"}}}' \
-    "$server" "$user" "$pass" "$auth"
+  # jq handles proper JSON escaping for passwords containing quotes or backslashes.
+  jq -cn \
+    --arg server "$server" \
+    --arg user   "$user"   \
+    --arg pass   "$pass"   \
+    --arg auth   "$auth"   \
+    '{"auths":{($server):{"username":$user,"password":$pass,"auth":$auth}}}'
 }
 
 create_or_replace_secret() {
@@ -115,6 +129,7 @@ fi
 # ── Print my-values.yaml snippet ────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────────────────────────────────────────"
+echo "Registry secrets created in namespace '$NAMESPACE'."
 echo "Add the following to your my-values.yaml:"
 echo "────────────────────────────────────────────────────────────────────────────"
 echo ""
@@ -122,25 +137,10 @@ echo "global:"
 echo "  imagePullSecrets:"
 echo "    - name: plextrac-registry-creds"
 if [[ -n "$CKEDITOR_SECRET_NAME" ]]; then
-  echo "    - name: $CKEDITOR_SECRET_NAME"
+  echo "    - name: ckeditor-registry-creds"
 fi
 echo ""
-echo "# If using secrets.mode: manual, also add:"
-echo "secrets:"
-echo "  manual:"
-echo "    generatedSecrets:"
-echo "      registryCredentials:"
-echo "        enabled: true"
-echo "        name: plextrac-registry-creds"
-echo "        dockerconfigjson: '$PLEXTRAC_JSON'"
-if [[ -n "$CKEDITOR_JSON" ]]; then
-  echo ""
-  echo "      # Second entry for CKEditor (add to secrets.manual.generatedSecrets.additional):"
-  echo "      additional:"
-  echo "        - name: $CKEDITOR_SECRET_NAME"
-  echo "          type: kubernetes.io/dockerconfigjson"
-  echo "          stringData:"
-  echo "            .dockerconfigjson: '$CKEDITOR_JSON'"
-fi
+echo "# Secrets have been created directly in the cluster — do not set"
+echo "# secrets.manual.generatedSecrets.registryCredentials.enabled: true."
 echo ""
 echo "────────────────────────────────────────────────────────────────────────────"
