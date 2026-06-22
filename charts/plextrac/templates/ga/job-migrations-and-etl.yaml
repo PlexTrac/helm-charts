@@ -2,18 +2,29 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   annotations:
+    # ArgoCD: keep this a Sync-phase hook so it re-runs on every sync and is ordered
+    # with the database resources; Argo recreates it each sync via the delete policy.
+    # (These argo annotations are inert under Helm.)
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-delete-policy: before-hook-creation
-    helm.sh/hook-weight: "-5"
   labels:
     app.kubernetes.io/version: 2.23.4
-  name: migrations-and-etl
+  # Helm: the Helm hook annotations were removed, so under Helm this is a NORMAL
+  # release resource applied alongside the database — NOT a post-install hook.
+  # plextracapi gates its own startup on this migration via a startupProbe, which avoids
+  # the old post-install-hook + `--wait` deadlock (Helm would otherwise block on
+  # plextracapi readiness before running a post-install hook, but plextracapi cannot
+  # become ready until this migration has run).
+  # Revision-keyed name: Jobs are immutable, so a fresh Job is created on each
+  # `helm upgrade` (revision increments) and the migration re-runs; Helm prunes the
+  # prior revision's Job. (Under Argo, Release.Revision is 1 and the Sync-hook delete
+  # policy above provides the re-run instead.)
+  name: migrations-and-etl-{{ .Release.Revision }}
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  backoffLimit: 2
+  backoffLimit: 6
   parallelism: 1
+  ttlSecondsAfterFinished: 86400
   template:
     metadata:
       annotations:
@@ -22,6 +33,23 @@ spec:
       labels:
         app.kubernetes.io/version: 2.23.4
     spec:
+      initContainers:
+      # As a normal resource this Job is applied concurrently with the database, so it
+      # may start before Postgres is accepting connections. Wait for it first. (Couchbase
+      # and Redis timing is covered by the Job's backoffLimit retries.) Reuses the chart's
+      # existing postgres image — no extra image/registry dependency.
+      - name: wait-for-postgres
+        image: {{ .Values.images.postgres.repository }}:{{ .Values.images.postgres.tag }}
+        imagePullPolicy: Always
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for postgres:5432 to accept connections..."
+          until pg_isready -h postgres -p 5432; do
+            echo "postgres not ready yet; retrying in 3s"; sleep 3
+          done
+          echo "postgres is ready"
       containers:
       - args:
         - |

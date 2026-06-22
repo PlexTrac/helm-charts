@@ -18,6 +18,8 @@ See [docs/user-guide.md](docs/user-guide.md) for the full phased installation gu
 # 1. Install K3s (disable Traefik — PlexTrac uses NGINX)
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
 mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config
+# K3s' kubectl defaults to the root-only /etc/rancher/k3s/k3s.yaml — point it at your copy:
+export KUBECONFIG=$HOME/.kube/config && echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
 
 # 2. Install NGINX Ingress Controller
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update
@@ -41,11 +43,13 @@ helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
   --create-namespace \
   -f my-values.yaml \
-  --wait --timeout 10m
+  --wait --timeout 15m   # first install runs DB migrations inline; allow time
 
 # 7. Verify
 curl -I https://plextrac.mycompany.com/api/v2/health/full
 ```
+
+> **If `--wait` does not complete:** the `migrations-and-etl` Job migrates the database on first install, and `plextracapi` will not become Ready until it finishes. Check `kubectl -n plextrac logs job/migrations-and-etl-<revision>` and `kubectl -n plextrac get pods` — a failing migration or an unpullable image (wrong registry/pull-secret name) is the usual cause. See [Troubleshooting](docs/user-guide.md#troubleshooting).
 
 ## Uninstalling
 
@@ -78,6 +82,8 @@ kubectl -n plextrac delete pvc --all
 | `examples/values-csi-aws.yaml` | CSI driver with AWS Secrets Manager |
 | `examples/values-csi-gcp.yaml` | CSI driver with GCP Secret Manager |
 | `examples/values-override-template.yaml` | Blank template — copy and uncomment what you need |
+
+> All files under `charts/plextrac/examples/` are **overlays**: apply them with `-f` on top of the chart (which loads its own `values.yaml` first), and they override only the keys they contain. Layer multiple `-f` files if needed — later files win. Don't rely on an example as your only configuration if it omits keys the chart requires.
 
 ## Versioning
 
