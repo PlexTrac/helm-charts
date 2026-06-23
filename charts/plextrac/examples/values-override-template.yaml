@@ -7,6 +7,9 @@
 #   namespace: plextrac
 #   # Set false when namespace already exists.
 #   createNamespace: false
+#   # Optional registry override — applied to all images except ckeditor (which keeps its own).
+#   image:
+#     registry: ""   # e.g. registry.mycompany.com
 #   ingress:
 #     # Required for valid Ingress objects.
 #     host: example.plextrac.com
@@ -86,11 +89,12 @@
 #       application: []
 #       shared: []
 
-# Optional image overrides (tag pinning or custom repos)
+# Optional per-component image overrides (tag pinning, custom repo, or per-component registry).
+# Use global.image.registry above to re-home every image at once; override here only where needed.
 # images:
 #   backend:
-#     repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
-#     tag: 2.27.4
-#   nginx:
-#     repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
-#     tag: 2.27.4
+#     tag: "2.28.0"                      # pin a specific version
+#   ckeditor:
+#     registry: registry.mycompany.com   # mirror CKEditor (overrides its pinned default registry)
+#     repository: cke-cs/cs
+#     tag: latest

@@ -37,7 +37,8 @@ images:
     repository: registry.dorf.plextrac.ninja/cicd-app-images/ruxpin
     tag: 2.18.2
   ckeditor:
-    repository: registry.dorf.plextrac.ninja/ckeditor-registry-proxy/cs
+    registry: registry.dorf.plextrac.ninja
+    repository: ckeditor-registry-proxy/cs
     tag: 4.25.0
   postgres:
     repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracpostgres

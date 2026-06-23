@@ -345,6 +345,16 @@ secrets:
         dockerconfigjson: '<paste your dockerconfigjson blob here>'
 ```
 
+If you pull PlexTrac's images from your own registry or a mirror rather than the defaults, set the registry **before** installing — one value re-homes every component except `ckeditor` (which keeps its own registry):
+
+```yaml
+global:
+  image:
+    registry: registry.mycompany.com   # your registry/mirror; applied to all images except ckeditor
+```
+
+The pull secret in `global.imagePullSecrets` (above) must grant access to whatever registry you point at. To mirror CKEditor too, or to override a single component, see [Reference: Image overrides](#reference-image-overrides).
+
 Preview the rendered output before installing to catch errors early:
 
 ```bash
