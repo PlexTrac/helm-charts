@@ -168,11 +168,6 @@ spec:
             secretKeyRef:
               key: PG_CKEDITOR_ADMIN_USER
               name: application-secrets
-        - name: PG_RUNBOOKS_DB
-          valueFrom:
-            secretKeyRef:
-              key: PG_RUNBOOKS_DB
-              name: application-secrets
         - name: PG_RUNBOOKS_RO_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -192,11 +187,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: PG_RUNBOOKS_RW_USER
-              name: application-secrets
-        - name: PG_CKEDITOR_DB
-          valueFrom:
-            secretKeyRef:
-              key: PG_CKEDITOR_DB
               name: application-secrets
         - name: PG_CKEDITOR_RO_PASSWORD
           valueFrom:
