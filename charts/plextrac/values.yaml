@@ -2,6 +2,12 @@ global:
   namespace: plextrac
   createNamespace: true
   imagePullSecrets: []   # e.g. [{name: ckeditor-registry-creds}]
+  image:
+    # Optional registry prefix applied to every component image EXCEPT those that set
+    # their own images.<component>.registry (e.g. ckeditor). Leave "" to use each
+    # repository as-is; set it to your registry/mirror to re-home all images at once,
+    # e.g. registry: registry.mycompany.com
+    registry: ""
   ingress:
     host: ""
     tlsSecretName: plextrac-com-tls
@@ -140,6 +146,9 @@ secrets:
         key: ""
       additional: []
 
+# Each component's image renders as "<registry>/<repository>:<tag>", where <registry>
+# is images.<component>.registry if set, else global.image.registry, else omitted.
+# Components below without a `registry:` inherit global.image.registry.
 images:
   backend:
     repository: plextrac/plextracapi
@@ -148,7 +157,9 @@ images:
     repository: plextrac/plextracnginx
     tag: stable
   ckeditor:
-    repository: docker.cke-cs.com/cs
+    # Pinned to CKEditor's own registry — NOT affected by global.image.registry.
+    registry: docker.cke-cs.com
+    repository: cs
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb

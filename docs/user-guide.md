@@ -111,34 +111,33 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
   sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
   su - plextrac
   ```
-  Run every `kubectl` and `helm` command as this user; only the `cp`, `chown`, and `hostnamectl` steps need `sudo`.
-- **Set a short, stable hostname first.** K3s derives the Kubernetes node name from the machine's hostname. Long cloud-assigned names (for example the default instance names on GCP/AWS) can exceed the 63-character node-name limit and stop the node from registering. Set a short hostname and make it durable so it survives reboots:
-  ```bash
-  sudo hostnamectl set-hostname plextrac-node
-  # hostnamectl alone is not always durable on cloud images. Also stop the cloud
-  # agent from rewriting the hostname on boot:
-  #   cloud-init:  set 'preserve_hostname: true' in /etc/cloud/cloud.cfg
-  #   GCP:         set 'set-hostname: false' under [Instance] in /etc/default/instance_configs.cfg
-  ```
-  If K3s is already installed under the wrong name, set the hostname and then `sudo systemctl restart k3s` so the node re-registers.
+  Run every `kubectl` and `helm` command as this user. Only running the K3s installer below uses `sudo`. Because the installer is given `--write-kubeconfig-mode 644`, the kubeconfig is readable and nothing after install (`kubectl`, `helm`, the chart install) needs `sudo`.
+- **Give K3s an explicit node name** instead of letting it use the OS hostname. K3s derives the node name from the hostname, and a long or non-RFC-1123 cloud hostname (e.g. a GCP/AWS instance name) can exceed the 63-character limit and stop the node from registering. Rather than fighting the cloud agent that rewrites the hostname on every boot, pass `--node-name` to the installer — it is baked into the K3s systemd unit and reused on every start, so the node name survives reboots and hostname changes. The install below derives a valid name from the current hostname and pins it **before** K3s first registers the node.
 
 ```bash
-# Install K3s and disable the built-in Traefik ingress controller.
-# PlexTrac uses NGINX — running both causes conflicts.
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+# Derive a valid K3s node name from the hostname:
+# lowercase, non-alphanumerics -> '-', collapse repeats, trim to the 63-char limit.
+NODE_NAME=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' \
+  | sed -E 's/-+/-/g; s/^-+//; s/-+$//' | cut -c1-63 | sed -E 's/-+$//')
+[ -z "$NODE_NAME" ] && NODE_NAME=plextrac-node
+echo "K3s node name: $NODE_NAME"
 
-# Copy the kubeconfig so kubectl and helm can reach the cluster as your user.
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown $(id -u):$(id -g) ~/.kube/config
+# Install K3s in the SAME shell so $NODE_NAME is set. These args are baked into the K3s
+# systemd unit and reused on every start:
+#   --node-name             pins the node name, independent of the long/reset-on-boot hostname
+#   --disable traefik       PlexTrac uses NGINX; running both conflicts
+#   --write-kubeconfig-mode makes /etc/rancher/k3s/k3s.yaml readable by your non-root user
+#                           (644 = readable by any local user on this host; fine for a
+#                           dedicated single-node appliance)
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644 --node-name $NODE_NAME" sh -
 
-# Point kubectl/helm at this kubeconfig. The K3s-bundled kubectl defaults to the
-# root-only /etc/rancher/k3s/k3s.yaml, so without KUBECONFIG you would have to run
-# every command with sudo and the copy above would have no effect.
-export KUBECONFIG=$HOME/.kube/config
-echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+# Point kubectl/helm at the kubeconfig K3s wrote. With --write-kubeconfig-mode above
+# it is readable by your user — no sudo, no copy, and no chown needed.
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
 
-# Confirm the node is Ready (no sudo needed)
+# Confirm the node is Ready and registered under your chosen name (no sudo needed)
 kubectl get nodes
 ```
 
@@ -626,7 +625,9 @@ Leave `certManagerClusterIssuer` blank and `tls.enabled: false`.
 
 All images are configurable, and the chart can pull from **any Docker Registry HTTP API v2 or OCI-compliant registry** — Docker Hub, Harbor, GHCR, ECR/GCR/ACR, a self-hosted registry, or a pull-through mirror/proxy of one. PlexTrac's application images require credentials to pull (see [Using a private registry (imagePullSecrets)](#using-a-private-registry-imagepullsecrets)).
 
-Each component's image is set independently as `images.<component>.repository` (the full path including the registry host) and `images.<component>.tag`. There is no single global registry switch today, so to move every image to your own registry or mirror you override each `repository` entry individually, as shown below.
+Each component image renders as `<registry>/<repository>:<tag>`. The `<registry>` is, in order: the component's own `images.<component>.registry` if set; otherwise `global.image.registry`; otherwise nothing (the `repository` is used as-is, exactly as the defaults ship). So you can re-home every image with one value, override a single component, or leave the defaults alone.
+
+> **`ckeditor` is pinned to its own registry** (`images.ckeditor.registry: docker.cke-cs.com`) and uses separate pull credentials, so `global.image.registry` does **not** move it. To mirror CKEditor too, set `images.ckeditor.registry` explicitly (see below).
 
 ### Pinning a specific version
 
@@ -638,38 +639,34 @@ images:
     tag: "2.28.0"
 ```
 
-### Using a private registry mirror
+### Re-home all images to one registry
+
+Point every component except `ckeditor` at your registry or mirror with a single value:
 
 ```yaml
+global:
+  image:
+    registry: registry.mycompany.com
+```
+
+This renders `registry.mycompany.com/plextrac/plextracapi:stable`, `registry.mycompany.com/redis:8.4.0-alpine`, and so on, while `ckeditor` stays on `docker.cke-cs.com/cs`.
+
+### Override a single component's registry
+
+Set `images.<component>.registry` to override the global value for one component — this is also how you re-home `ckeditor`. Keep `repository` as the path **without** the host:
+
+```yaml
+global:
+  image:
+    registry: registry.mycompany.com   # all other components
 images:
-  backend:
-    repository: registry.mycompany.com/plextrac/plextracapi
-    tag: stable
-  nginx:
-    repository: registry.mycompany.com/plextrac/plextracnginx
-    tag: stable
-  plextracdb:
-    repository: registry.mycompany.com/plextrac/plextracdb
-    tag: 6.5.1
-  postgres:
-    repository: registry.mycompany.com/plextrac/plextracpostgres
-    tag: stable
-  minio:
-    repository: registry.mycompany.com/plextrac/minio
-    tag: latest
-  minioBootstrap:
-    repository: registry.mycompany.com/plextrac/plextrac-minio-bootstrap
-    tag: stable
   ckeditor:
-    repository: registry.mycompany.com/cke-cs/cs
-    tag: latest
-  redis:
-    repository: registry.mycompany.com/redis
-    tag: 8.4.0-alpine
-  redisExporter:
-    repository: registry.mycompany.com/oliver006/redis_exporter
+    registry: registry.mycompany.com   # mirror CKEditor here too
+    repository: cke-cs/cs
     tag: latest
 ```
+
+You can also leave `global.image.registry` empty and put a full path (host included) directly in a component's `repository` — that still works for any component with no `registry` value.
 
 ### Using a private registry (imagePullSecrets)
 
@@ -862,26 +859,25 @@ helm rollback plextrac <revision-number> -n plextrac
 
 ### `kubectl` fails with `permission denied` / only works with `sudo`
 
-The K3s-bundled `kubectl` defaults to the root-only `/etc/rancher/k3s/k3s.yaml`. Copying it to `~/.kube/config` has no effect until you point `KUBECONFIG` at it:
+By default K3s writes `/etc/rancher/k3s/k3s.yaml` as root-only (mode 0600), so a non-root user cannot read it. Install K3s with `--write-kubeconfig-mode 644` (see [Step 1.1](#step-11--provision-a-kubernetes-cluster)) so it is created readable, then point `KUBECONFIG` at it — no `sudo` needed:
 
 ```bash
-export KUBECONFIG=$HOME/.kube/config
-echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
 ```
 
-See [Step 1.1](#step-11--provision-a-kubernetes-cluster).
+If you already installed without that flag, either reinstall, or copy it once with `sudo`: `sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config`, then `export KUBECONFIG=$HOME/.kube/config`.
 
 ### Node never becomes `Ready` / does not register
 
-K3s derives the node name from the host's hostname; a long cloud-assigned hostname can exceed the 63-character node-name limit. Set a short, durable hostname and restart K3s:
+K3s derives the node name from the host's hostname; a long or non-RFC-1123 cloud hostname can exceed the 63-character limit and block registration. Pin an explicit `node-name` rather than relying on the hostname. On a fresh single-node box the simplest fix is a clean reinstall with a valid node name (see [Step 1.1](#step-11--provision-a-kubernetes-cluster)):
 
 ```bash
-sudo hostnamectl set-hostname plextrac-node
-sudo systemctl restart k3s
-kubectl get nodes
+/usr/local/bin/k3s-uninstall.sh
+# then re-run the Step 1.1 install, which passes --node-name to the installer
 ```
 
-Make the hostname durable so it survives reboots — see [Step 1.1](#step-11--provision-a-kubernetes-cluster).
+Changing `node-name` on an already-registered node triggers a `Node password rejected` error and leaves a stale node object behind, which is why a clean reinstall is simplest before any workloads exist.
 
 ### Install does not complete / `plextracapi` stuck not Ready
 

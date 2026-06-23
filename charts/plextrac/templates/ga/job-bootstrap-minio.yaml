@@ -61,7 +61,7 @@ spec:
             configMapKeyRef:
               key: UPSTREAM_CLOUD_BUCKET
               name: env-config
-        image: {{ .Values.images.minioBootstrap.repository }}:{{ .Values.images.minioBootstrap.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.minioBootstrap "root" $) }}
         name: bootstrap-minio
       {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       restartPolicy: Never

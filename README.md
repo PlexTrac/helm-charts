@@ -15,11 +15,10 @@ See [docs/user-guide.md](docs/user-guide.md) for the full phased installation gu
 ## Quick start (K3s)
 
 ```bash
-# 1. Install K3s (disable Traefik — PlexTrac uses NGINX)
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
-mkdir -p ~/.kube && sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config
-# K3s' kubectl defaults to the root-only /etc/rancher/k3s/k3s.yaml — point it at your copy:
-export KUBECONFIG=$HOME/.kube/config && echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+# 1. Install K3s (disable Traefik — PlexTrac uses NGINX; write a non-root-readable kubeconfig)
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -
+# kubeconfig is now readable without sudo — point kubectl/helm at it directly:
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
 
 # 2. Install NGINX Ingress Controller
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update

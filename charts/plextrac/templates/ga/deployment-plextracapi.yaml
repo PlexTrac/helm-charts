@@ -197,7 +197,7 @@ spec:
         envFrom:
         - configMapRef:
             name: env-config
-        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
         imagePullPolicy: Always
         # Gate liveness/readiness until the first successful health check. On a fresh
         # install the database migration (migrations-and-etl Job) runs concurrently and

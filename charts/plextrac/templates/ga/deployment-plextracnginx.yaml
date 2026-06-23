@@ -68,7 +68,7 @@ spec:
           value: "false"
         - name: WAF_ENABLED
           value: "false"
-        image: {{ .Values.images.nginx.repository }}:{{ .Values.images.nginx.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.nginx "root" $) }}
         imagePullPolicy: Always
         name: plextracnginx
         ports:
@@ -94,7 +94,7 @@ spec:
         command:
         - sh
         - -c
-        image: {{ .Values.images.nginx.repository }}:{{ .Values.images.nginx.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.nginx "root" $) }}
         imagePullPolicy: Always
         name: init-plextracnginx-customer-waf-rules
         securityContext:

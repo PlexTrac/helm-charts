@@ -39,7 +39,7 @@ spec:
       # and Redis timing is covered by the Job's backoffLimit retries.) Reuses the chart's
       # existing postgres image — no extra image/registry dependency.
       - name: wait-for-postgres
-        image: {{ .Values.images.postgres.repository }}:{{ .Values.images.postgres.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
         imagePullPolicy: Always
         command:
         - sh
@@ -245,7 +245,7 @@ spec:
         envFrom:
         - configMapRef:
             name: env-config
-        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
         name: migrations-and-etl
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads

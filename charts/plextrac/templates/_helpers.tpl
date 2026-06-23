@@ -57,3 +57,24 @@ imagePullSecrets:
 {{- randAlphaNum 32 -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Render a component image reference: "<registry>/<repository>:<tag>".
+Resolution order for the registry prefix:
+  1. the component's own .registry (e.g. images.ckeditor.registry) — wins if set
+  2. else global.image.registry
+  3. if neither is set, the repository is used as-is (no prefix)
+Call as: {{ include "plextrac.image" (dict "image" .Values.images.<component> "root" $) }}
+*/}}
+{{- define "plextrac.image" -}}
+{{- $globalReg := "" -}}
+{{- if .root.Values.global.image -}}
+{{- $globalReg = .root.Values.global.image.registry | default "" -}}
+{{- end -}}
+{{- $reg := .image.registry | default $globalReg -}}
+{{- if $reg -}}
+{{- printf "%s/%s:%s" $reg .image.repository .image.tag -}}
+{{- else -}}
+{{- printf "%s:%s" .image.repository .image.tag -}}
+{{- end -}}
+{{- end -}}
