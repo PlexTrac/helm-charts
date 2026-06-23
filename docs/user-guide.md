@@ -171,7 +171,27 @@ kubectl -n ingress-nginx get pods
 kubectl -n ingress-nginx get svc ingress-nginx-controller
 ```
 
-The `ingress-nginx-controller` Service will have an `EXTERNAL-IP` once the LoadBalancer is provisioned. **Note this IP — you need it for DNS in the next step.**
+On a managed cluster (GKE/AKS/EKS) the `ingress-nginx-controller` Service gets a real cloud `EXTERNAL-IP` once the LoadBalancer is provisioned — note it for DNS in the next step.
+
+> **On K3s (single VM), the `EXTERNAL-IP` shown is the node's own IP**, not a public address. K3s's built-in load balancer (ServiceLB) assigns the node address, and on a cloud VM that is the **internal/private** IP — the public IP is attached by the provider via 1:1 NAT and is not visible to the OS. Do **not** use that address for public DNS.
+
+The IP to use for DNS is the VM's **provider-assigned external IP**. On GCP, read it from the VM:
+
+```bash
+curl -s -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"; echo
+# AWS:  curl -s http://169.254.169.254/latest/meta-data/public-ipv4
+# An empty result means the VM has no external IP — assign one, or there is no public access.
+```
+
+You must also **open the firewall** for inbound `tcp:80,443` to the VM, or nothing external can reach the ingress. On GCP:
+
+```bash
+gcloud compute firewall-rules create plextrac-web \
+  --allow tcp:80,tcp:443 --direction INGRESS --target-tags <vm-network-tag>
+```
+
+Traffic to that external IP NATs to the node and into ingress-nginx, so PlexTrac is reachable even though `kubectl` shows the internal address. **Note the external IP — you need it for DNS in the next step.**
 
 ---
 
