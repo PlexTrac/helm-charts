@@ -116,7 +116,7 @@ spec:
             secretKeyRef:
               key: LAUNCH_DARKLY_SDK_KEY
               name: shared-secrets
-        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3

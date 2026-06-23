@@ -10,6 +10,8 @@ global:
   imagePullSecrets:
     - name: plextrac-registry-creds
     # - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
+  # image:
+  #   registry: ""   # set to your registry/mirror to re-home all images except ckeditor
   ingress:
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls
@@ -46,7 +48,8 @@ images:
     repository: plextrac/plextracnginx
     tag: stable
   ckeditor:
-    repository: docker.cke-cs.com/cs
+    registry: docker.cke-cs.com
+    repository: cs
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb

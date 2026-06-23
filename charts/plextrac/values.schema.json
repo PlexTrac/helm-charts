@@ -17,6 +17,12 @@
             "required": ["name"]
           }
         },
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": { "type": "string" }
+          }
+        },
         "ingress": {
           "type": "object",
           "properties": {
@@ -214,6 +220,7 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "registry": { "type": "string" },
           "repository": { "type": "string", "minLength": 1 },
           "tag": { "type": "string", "minLength": 1 }
         },

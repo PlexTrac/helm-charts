@@ -42,8 +42,10 @@ Read through this checklist before touching any `helm` command. Installing the c
 | redis | StatefulSet | 1 |
 | postgres | Deployment | 1 |
 | minio | Deployment | 1 |
-| minio-bootstrap | Job | — |
+| bootstrap-minio | Job | — |
 | migrations-and-etl | Job | — |
+
+> `datalake-maintainer` ships **disabled** (0 replicas) by default — seeing it with no pods is expected and does not block startup. `migrations-and-etl` runs as a normal Job during install (its name includes the release revision, e.g. `migrations-and-etl-1`) and migrates the database before the API reports healthy. `bootstrap-minio` is a Helm **post-install/post-upgrade hook**, so it appears only *after* the main workloads are running. See [Phase 4](#phase-4--install).
 
 **Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
 
@@ -56,6 +58,19 @@ Read through this checklist before touching any `helm` command. Installing the c
 | NGINX Ingress Controller | any current release |
 
 > All Ingress resources use `ingressClassName: nginx`. Other ingress controllers are not supported without changes to annotations and ingress class values.
+
+### Install Helm
+
+The chart requires Helm 3.10 or newer. If Helm is not already on the machine you run installs from, install it before Phase 1. (`kubectl` is bundled with K3s; on managed clusters install it through your provider's flow.)
+
+```bash
+# Official installer (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+helm version   # confirm v3.10.0 or newer
+```
+
+Distribution packages (`apt install helm`, `dnf install helm`, `brew install helm`) also work as long as they provide 3.10+.
 
 ### What the chart auto-generates
 
@@ -88,17 +103,41 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
 - Ports 6443 (API), 80 and 443 (ingress) open
 - **Minimum node sizing:** 4 vCPU, 16 GiB RAM, 100 GiB disk
 
+**Before installing K3s:**
+
+- **Run the install as a dedicated non-root user**, not as `root`. Create one and give it `sudo` for the few privileged steps:
+  ```bash
+  sudo useradd -m -s /bin/bash plextrac
+  sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
+  su - plextrac
+  ```
+  Run every `kubectl` and `helm` command as this user. Only running the K3s installer below uses `sudo`. Because the installer is given `--write-kubeconfig-mode 644`, the kubeconfig is readable and nothing after install (`kubectl`, `helm`, the chart install) needs `sudo`.
+- **Give K3s an explicit node name** instead of letting it use the OS hostname. K3s derives the node name from the hostname, and a long or non-RFC-1123 cloud hostname (e.g. a GCP/AWS instance name) can exceed the 63-character limit and stop the node from registering. Rather than fighting the cloud agent that rewrites the hostname on every boot, pass `--node-name` to the installer — it is baked into the K3s systemd unit and reused on every start, so the node name survives reboots and hostname changes. The install below derives a valid name from the current hostname and pins it **before** K3s first registers the node.
+
 ```bash
-# Install K3s and disable the built-in Traefik ingress controller.
-# PlexTrac uses NGINX — running both causes conflicts.
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+# Derive a valid K3s node name from the hostname:
+# lowercase, non-alphanumerics -> '-', collapse repeats, trim to the 63-char limit.
+NODE_NAME=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' \
+  | sed -E 's/-+/-/g; s/^-+//; s/-+$//' | cut -c1-63 | sed -E 's/-+$//')
+[ -z "$NODE_NAME" ] && NODE_NAME=plextrac-node
+echo "K3s node name: $NODE_NAME"
 
-# Copy kubeconfig so kubectl and helm can reach the cluster
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown $(id -u):$(id -g) ~/.kube/config
+# Install K3s in the SAME shell so $NODE_NAME is set. These args are baked into the K3s
+# systemd unit and reused on every start:
+#   --node-name             pins the node name, independent of the long/reset-on-boot hostname
+#   --disable traefik       PlexTrac uses NGINX; running both conflicts
+#   --write-kubeconfig-mode makes /etc/rancher/k3s/k3s.yaml readable by your non-root user
+#                           (644 = readable by any local user on this host; fine for a
+#                           dedicated single-node appliance)
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644 --node-name $NODE_NAME" sh -
 
-# Confirm the node is Ready
+# Point kubectl/helm at the kubeconfig K3s wrote. With --write-kubeconfig-mode above
+# it is readable by your user — no sudo, no copy, and no chown needed.
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+
+# Confirm the node is Ready and registered under your chosen name (no sudo needed)
 kubectl get nodes
 ```
 
@@ -132,7 +171,27 @@ kubectl -n ingress-nginx get pods
 kubectl -n ingress-nginx get svc ingress-nginx-controller
 ```
 
-The `ingress-nginx-controller` Service will have an `EXTERNAL-IP` once the LoadBalancer is provisioned. **Note this IP — you need it for DNS in the next step.**
+On a managed cluster (GKE/AKS/EKS) the `ingress-nginx-controller` Service gets a real cloud `EXTERNAL-IP` once the LoadBalancer is provisioned — note it for DNS in the next step.
+
+> **On K3s (single VM), the `EXTERNAL-IP` shown is the node's own IP**, not a public address. K3s's built-in load balancer (ServiceLB) assigns the node address, and on a cloud VM that is the **internal/private** IP — the public IP is attached by the provider via 1:1 NAT and is not visible to the OS. Do **not** use that address for public DNS.
+
+The IP to use for DNS is the VM's **provider-assigned external IP**. On GCP, read it from the VM:
+
+```bash
+curl -s -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"; echo
+# AWS:  curl -s http://169.254.169.254/latest/meta-data/public-ipv4
+# An empty result means the VM has no external IP — assign one, or there is no public access.
+```
+
+You must also **open the firewall** for inbound `tcp:80,443` to the VM, or nothing external can reach the ingress. On GCP:
+
+```bash
+gcloud compute firewall-rules create plextrac-web \
+  --allow tcp:80,tcp:443 --direction INGRESS --target-tags <vm-network-tag>
+```
+
+Traffic to that external IP NATs to the node and into ingress-nginx, so PlexTrac is reachable even though `kubectl` shows the internal address. **Note the external IP — you need it for DNS in the next step.**
 
 ---
 
@@ -165,7 +224,7 @@ cp .env.example .env.local
 # Edit .env.local with your domain, credentials, and any optional integration keys
 ```
 
-`.env.local` is a reference document, not something Helm reads directly. Once you have filled it in, you will use it as a translation guide in [Phase 3](#phase-3--configure-your-values-file) — each variable includes a comment showing the exact `my-values.yaml` field it maps to.
+`.env.local` is **not** read by Helm. Only `scripts/setup-registry-credentials.sh` reads it, and only the `DOCKER_*` / `CKEDITOR_DOCKER_*` variables. Every other variable — your domain, TLS, storage class, admin email, integrations — is a reference checklist that you copy into `my-values.yaml` yourself in [Phase 3](#phase-3--configure-your-values-file); each variable includes a comment showing the exact `my-values.yaml` field it maps to. Setting `PLEXTRAC_DOMAIN` in `.env.local`, for example, does **not** configure the chart — you must also set `global.ingress.host` in `my-values.yaml`.
 
 ### 2.1 — Required: domain
 
@@ -290,21 +349,31 @@ secrets:
         enabled: false                        # set to true if providing cert inline
 ```
 
-If you need Docker registry credentials (from Step 2.2), also add:
+If your images require a pull secret, reference it under `global.imagePullSecrets`. This can be the secret created by the setup script in [Step 2.2](#22--docker-registry-credentials) (named `plextrac-registry-creds`), or any existing `kubernetes.io/dockerconfigjson` secret in the namespace — the name just has to match a secret that exists. If you ran the setup script, paste the snippet it printed instead of writing this by hand:
 
 ```yaml
 global:
   imagePullSecrets:
-    - name: regcred
+    - name: plextrac-registry-creds      # must match the secret you created
 
 secrets:
   manual:
     generatedSecrets:
       registryCredentials:
         enabled: true
-        name: regcred
+        name: plextrac-registry-creds
         dockerconfigjson: '<paste your dockerconfigjson blob here>'
 ```
+
+If you pull PlexTrac's images from your own registry or a mirror rather than the defaults, set the registry **before** installing — one value re-homes every component except `ckeditor` (which keeps its own registry):
+
+```yaml
+global:
+  image:
+    registry: registry.mycompany.com   # your registry/mirror; applied to all images except ckeditor
+```
+
+The pull secret in `global.imagePullSecrets` (above) must grant access to whatever registry you point at. To mirror CKEditor too, or to override a single component, see [Reference: Image overrides](#reference-image-overrides).
 
 Preview the rendered output before installing to catch errors early:
 
@@ -322,16 +391,24 @@ helm upgrade --install plextrac ./charts/plextrac \
   --create-namespace \
   -f my-values.yaml \
   --wait \
-  --timeout 10m
+  --timeout 15m
 ```
 
-`--wait` blocks until all pods are healthy or the timeout is reached. Check progress in another terminal:
+`--wait` blocks until all pods are healthy or the timeout is reached. The first install runs the database migration inline (see below), which can take several minutes, so allow a generous `--timeout`. Check progress in another terminal:
 
 ```bash
 kubectl -n plextrac get pods -w
 ```
 
-Normal startup order: `plextracdb` → `postgres` → `redis` → `minio` → `migrations-and-etl` (Job) → `plextracapi` → everything else.
+**Startup order:** the core data services come up first (`plextracdb` → `postgres` → `redis` → `minio`). The `migrations-and-etl` Job runs as a normal release resource alongside them — it waits for Postgres, then migrates the database. `plextracapi` starts in parallel but uses a **startup probe**, so it is not marked Ready (and is not restarted) until the migration has completed and `/api/v2/health/full` passes. `bootstrap-minio` is a Helm **post-install hook**, so it runs after the main workloads are Ready.
+
+> **If `--wait` does not complete:** check the migration Job and the pods. On a fresh install the API cannot become Ready until `migrations-and-etl` finishes, so a failed or stuck migration keeps the install waiting:
+> ```bash
+> kubectl -n plextrac get jobs
+> kubectl -n plextrac logs job/migrations-and-etl-<revision> --tail=50
+> kubectl -n plextrac get pods
+> ```
+> The usual causes are an image that cannot be pulled (`ImagePullBackOff` — check your registry and pull-secret name) or a data service that never became Ready. See [Troubleshooting](#troubleshooting).
 
 ### Uninstalling
 
@@ -512,6 +589,8 @@ kubectl get storageclass
 
 > **Important:** Set `storage.storageClassName` **before first install**. Changing it after the initial install does not migrate existing PVCs — PVCs are immutable after creation. Migration requires backing up data, deleting and recreating PVCs, and restoring.
 
+> **This chart targets a single-node K3s cluster.** `plextracapi-pvc` is `ReadWriteOnce` and is shared by all `plextracapi` replicas (default 3) and the `migrations-and-etl` Job — which is fine when everything runs on one node. Multi-node is not a supported topology: a `ReadWriteOnce` volume attaches to a single node, so pods scheduled elsewhere would get stuck `FailedAttachVolume`. If you must run multi-node, switch these claims to a `ReadWriteMany`-capable StorageClass.
+
 ---
 
 ## Reference: TLS configuration
@@ -574,7 +653,11 @@ Leave `certManagerClusterIssuer` blank and `tls.enabled: false`.
 
 ## Reference: Image overrides
 
-All images are configurable. Defaults point to the PlexTrac registry — credentials are required to pull them.
+All images are configurable, and the chart can pull from **any Docker Registry HTTP API v2 or OCI-compliant registry** — Docker Hub, Harbor, GHCR, ECR/GCR/ACR, a self-hosted registry, or a pull-through mirror/proxy of one. PlexTrac's application images require credentials to pull (see [Using a private registry (imagePullSecrets)](#using-a-private-registry-imagepullsecrets)).
+
+Each component image renders as `<registry>/<repository>:<tag>`. The `<registry>` is, in order: the component's own `images.<component>.registry` if set; otherwise `global.image.registry`; otherwise nothing (the `repository` is used as-is, exactly as the defaults ship). So you can re-home every image with one value, override a single component, or leave the defaults alone.
+
+> **`ckeditor` is pinned to its own registry** (`images.ckeditor.registry: docker.cke-cs.com`) and uses separate pull credentials, so `global.image.registry` does **not** move it. To mirror CKEditor too, set `images.ckeditor.registry` explicitly (see below).
 
 ### Pinning a specific version
 
@@ -586,38 +669,34 @@ images:
     tag: "2.28.0"
 ```
 
-### Using a private registry mirror
+### Re-home all images to one registry
+
+Point every component except `ckeditor` at your registry or mirror with a single value:
 
 ```yaml
+global:
+  image:
+    registry: registry.mycompany.com
+```
+
+This renders `registry.mycompany.com/plextrac/plextracapi:stable`, `registry.mycompany.com/redis:8.4.0-alpine`, and so on, while `ckeditor` stays on `docker.cke-cs.com/cs`.
+
+### Override a single component's registry
+
+Set `images.<component>.registry` to override the global value for one component — this is also how you re-home `ckeditor`. Keep `repository` as the path **without** the host:
+
+```yaml
+global:
+  image:
+    registry: registry.mycompany.com   # all other components
 images:
-  backend:
-    repository: registry.mycompany.com/plextrac/plextracapi
-    tag: stable
-  nginx:
-    repository: registry.mycompany.com/plextrac/plextracnginx
-    tag: stable
-  plextracdb:
-    repository: registry.mycompany.com/plextrac/plextracdb
-    tag: 6.5.1
-  postgres:
-    repository: registry.mycompany.com/plextrac/plextracpostgres
-    tag: stable
-  minio:
-    repository: registry.mycompany.com/plextrac/minio
-    tag: latest
-  minioBootstrap:
-    repository: registry.mycompany.com/plextrac/plextrac-minio-bootstrap
-    tag: stable
   ckeditor:
-    repository: registry.mycompany.com/cke-cs/cs
-    tag: latest
-  redis:
-    repository: registry.mycompany.com/redis
-    tag: 8.4.0-alpine
-  redisExporter:
-    repository: registry.mycompany.com/oliver006/redis_exporter
+    registry: registry.mycompany.com   # mirror CKEditor here too
+    repository: cke-cs/cs
     tag: latest
 ```
+
+You can also leave `global.image.registry` empty and put a full path (host included) directly in a component's `repository` — that still works for any component with no `registry` value.
 
 ### Using a private registry (imagePullSecrets)
 
@@ -628,14 +707,14 @@ Every Deployment, StatefulSet, and Job will pick up `global.imagePullSecrets` au
 ```yaml
 global:
   imagePullSecrets:
-    - name: regcred
+    - name: plextrac-registry-creds
 
 secrets:
   manual:
     generatedSecrets:
       registryCredentials:
         enabled: true
-        name: regcred
+        name: plextrac-registry-creds
         dockerconfigjson: '{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}'
 ```
 
@@ -670,12 +749,12 @@ secrets:
   externalSecrets:
     registryCredentials:
       enabled: true
-      targetSecretName: regcred
+      targetSecretName: plextrac-registry-creds
       remoteKey: plextrac/registry-credentials
 
 global:
   imagePullSecrets:
-    - name: regcred
+    - name: plextrac-registry-creds
 ```
 
 ---
@@ -783,7 +862,8 @@ helm upgrade --install plextrac ./charts/plextrac \
 
 **What happens during upgrade:**
 - Deployments and StatefulSets with changed specs are updated with rolling-update strategy
-- The `migrations-and-etl` and `bootstrap-minio` Jobs are deleted and recreated (required because `Job.spec.template` is immutable)
+- `migrations-and-etl` runs again as a fresh Job each upgrade — its name includes the release revision (e.g. `migrations-and-etl-2`), so migrations re-run before the new API pods report healthy and Helm prunes the previous revision's Job
+- `bootstrap-minio` (a post-install hook) is deleted and recreated each release (required because `Job.spec.template` is immutable)
 - Secrets in manual mode are preserved — the chart looks up existing values and reuses them for any key not explicitly set in `stringData`
 
 **Preview changes before applying:**
@@ -801,9 +881,60 @@ helm history plextrac -n plextrac
 helm rollback plextrac <revision-number> -n plextrac
 ```
 
+> **Note:** a rollback creates a new, higher revision and runs a fresh `migrations-and-etl` Job for the chart version you roll back to — it re-runs that version's migrations *forward*, it does not reverse schema changes. Roll back the database from a backup separately if a migration is not backward-compatible.
+
 ---
 
 ## Troubleshooting
+
+### `kubectl` fails with `permission denied` / only works with `sudo`
+
+By default K3s writes `/etc/rancher/k3s/k3s.yaml` as root-only (mode 0600), so a non-root user cannot read it. Install K3s with `--write-kubeconfig-mode 644` (see [Step 1.1](#step-11--provision-a-kubernetes-cluster)) so it is created readable, then point `KUBECONFIG` at it — no `sudo` needed:
+
+```bash
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+```
+
+If you already installed without that flag, either reinstall, or copy it once with `sudo`: `sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && sudo chown $(id -u):$(id -g) ~/.kube/config`, then `export KUBECONFIG=$HOME/.kube/config`.
+
+### Node never becomes `Ready` / does not register
+
+K3s derives the node name from the host's hostname; a long or non-RFC-1123 cloud hostname can exceed the 63-character limit and block registration. Pin an explicit `node-name` rather than relying on the hostname. On a fresh single-node box the simplest fix is a clean reinstall with a valid node name (see [Step 1.1](#step-11--provision-a-kubernetes-cluster)):
+
+```bash
+/usr/local/bin/k3s-uninstall.sh
+# then re-run the Step 1.1 install, which passes --node-name to the installer
+```
+
+Changing `node-name` on an already-registered node triggers a `Node password rejected` error and leaves a stale node object behind, which is why a clean reinstall is simplest before any workloads exist.
+
+### Install does not complete / `plextracapi` stuck not Ready
+
+On a fresh install the `migrations-and-etl` Job migrates the database, and `plextracapi` will not pass its startup probe (so `--wait` will not finish) until that migration completes. If the install does not complete, check the migration Job first, then the pods:
+
+```bash
+kubectl -n plextrac get jobs
+kubectl -n plextrac logs job/migrations-and-etl-<revision> --tail=50
+kubectl -n plextrac get pods
+kubectl -n plextrac describe pod <not-ready-pod>
+```
+
+Common causes: the migration Job is failing (database not reachable or wrong secrets — the API stays not Ready until it succeeds), an image that cannot be pulled (see the next entry), or a data service (`plextracdb`, `postgres`, `redis`) that is not Ready. `bootstrap-minio` is a post-install hook and only runs once the main workloads are Ready.
+
+### `ImagePullBackOff` / `ErrImagePull`
+
+The image path or the pull secret is wrong:
+
+```bash
+kubectl -n plextrac describe pod <pod> | grep -A5 Events
+```
+
+- Confirm each `images.<component>.repository` points at a registry you can reach (see [Reference: Image overrides](#reference-image-overrides)).
+- Confirm the secret named in `global.imagePullSecrets` exists in the namespace and matches the name you created. The setup script creates `plextrac-registry-creds`; the name in your values file must match it exactly:
+  ```bash
+  kubectl -n plextrac get secret
+  ```
 
 ### Pods stuck in `Pending`
 
@@ -870,7 +1001,7 @@ kubectl -n ingress-nginx logs -l app.kubernetes.io/name=ingress-nginx --tail=100
 
 ### PlexTrac API returns 502 Bad Gateway
 
-nginx is up but cannot reach `plextracapi`. The API readiness probe is at `/api/v2/health/full` and fails if Couchbase, Redis, or Postgres are not ready:
+nginx is up but cannot reach `plextracapi`. The API readiness probe is at `/api/v2/health/full` and fails if Couchbase, Redis, or Postgres are not ready, or if the `migrations-and-etl` Job has not yet migrated the database:
 
 ```bash
 kubectl -n plextrac get pods -l app=plextracapi

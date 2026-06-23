@@ -41,7 +41,7 @@ spec:
             secretKeyRef:
               key: REDIS_PASSWORD
               name: application-secrets
-        image: {{ .Values.images.redisExporter.repository }}:{{ .Values.images.redisExporter.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.redisExporter "root" $) }}
         name: redis-exporter
         ports:
         - containerPort: 9121
@@ -70,7 +70,7 @@ spec:
             secretKeyRef:
               key: REDIS_PASSWORD
               name: application-secrets
-        image: {{ .Values.images.redis.repository }}:{{ .Values.images.redis.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.redis "root" $) }}
         name: redis
         ports:
         - containerPort: 6379

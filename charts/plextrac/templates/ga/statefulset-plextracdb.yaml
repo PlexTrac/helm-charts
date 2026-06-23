@@ -64,7 +64,7 @@ spec:
             secretKeyRef:
               key: CB_BACKUP_PASS
               name: application-secrets
-        image: {{ .Values.images.plextracdb.repository }}:{{ .Values.images.plextracdb.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.plextracdb "root" $) }}
         imagePullPolicy: Always
         lifecycle:
           postStart:

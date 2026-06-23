@@ -197,8 +197,22 @@ spec:
         envFrom:
         - configMapRef:
             name: env-config
-        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
         imagePullPolicy: Always
+        # Gate liveness/readiness until the first successful health check. On a fresh
+        # install the database migration (migrations-and-etl Job) runs concurrently and
+        # /api/v2/health/full cannot pass until it completes. While the startupProbe is
+        # failing the kubelet runs neither liveness nor readiness and will not kill this
+        # pod, so the API rides out the migration window instead of crash-looping.
+        # Budget ~= initialDelay 10s + failureThreshold 60 x period 10s = ~10 minutes.
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /api/v2/health/full
+            port: 4350
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           failureThreshold: 6
           httpGet:

@@ -169,7 +169,7 @@ spec:
             secretKeyRef:
               key: PG_CORE_AI_SQL_USER
               name: application-secrets
-        image: {{ .Values.images.postgres.repository }}:{{ .Values.images.postgres.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
         name: postgres
         ports:
         - containerPort: 5432

@@ -121,7 +121,7 @@ spec:
         envFrom:
         - configMapRef:
             name: env-config
-        image: {{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}
+        image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 6

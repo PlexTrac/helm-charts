@@ -45,7 +45,8 @@ images:
     repository: plextrac/plextracnginx
     tag: stable
   ckeditor:
-    repository: docker.cke-cs.com/cs
+    registry: docker.cke-cs.com
+    repository: cs
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb
