@@ -11,6 +11,15 @@ global:
   ingress:
     host: ""
     tlsSecretName: plextrac-com-tls
+    # cert-manager integration — choose how the TLS certificate is issued.
+    certManager:
+      # ""                    = none / bring-your-own (use certManagerClusterIssuer below)
+      # "selfSigned"          = local/dev: cert-manager mints a self-signed cert (browser warnings)
+      # "letsencrypt"         = public prod: ACME HTTP-01 via Let's Encrypt (needs public DNS + :80 open)
+      # "letsencrypt-staging" = like letsencrypt but against LE staging (untrusted, rate-limit-safe for testing)
+      issuer: ""
+      email: ""   # required when issuer is "letsencrypt" or "letsencrypt-staging"
+    # Used only when certManager.issuer is "" — name of an Issuer/ClusterIssuer you created yourself.
     certManagerClusterIssuer: ""
 
 storage:

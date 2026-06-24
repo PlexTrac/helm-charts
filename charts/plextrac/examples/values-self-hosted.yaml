@@ -15,7 +15,12 @@ global:
   ingress:
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls
-    certManagerClusterIssuer: ""   # Set to your ClusterIssuer name if using cert-manager
+    # TLS via cert-manager (cert-manager must be installed). Pick an issuer:
+    #   letsencrypt / letsencrypt-staging = public-facing (also set email); selfSigned = local/dev
+    certManager:
+      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
+      email: ""      # required for letsencrypt / letsencrypt-staging
+    certManagerClusterIssuer: ""   # used only when certManager.issuer is "" (your own issuer's name)
 
 secrets:
   mode: manual
