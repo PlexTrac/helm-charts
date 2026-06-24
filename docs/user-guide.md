@@ -359,11 +359,12 @@ helm template plextrac ./charts/plextrac -f my-values.yaml | less
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f my-values.yaml \
   --wait \
   --timeout 15m
 ```
+
+The namespace was already created (with Helm ownership labels) by the setup script in [Step 2.2](#22--docker-registry-credentials), so `--create-namespace` is not needed here.
 
 `--wait` blocks until all pods are healthy or the timeout is reached. The first install runs the database migration inline (see below), which can take several minutes, so allow a generous `--timeout`. Check progress in another terminal:
 

@@ -37,10 +37,9 @@ cp .env.example .env.local
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
 # Edit my-values.yaml — paste the snippet from step 4, set global.ingress.host
 
-# 6. Install
+# 6. Install (namespace was created by setup-registry-credentials.sh in step 4)
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f my-values.yaml \
   --wait --timeout 15m   # first install runs DB migrations inline; allow time
 
