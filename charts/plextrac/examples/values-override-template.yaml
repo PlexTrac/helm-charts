@@ -15,7 +15,11 @@
 #     host: example.plextrac.com
 #     # TLS secret used by plextracnginx ingress.
 #     tlsSecretName: plextrac-com-tls
-#     # Optional. Set when using cert-manager.
+#     # cert-manager TLS. issuer: letsencrypt | letsencrypt-staging | selfSigned | "" (none / BYO)
+#     certManager:
+#       issuer: ""
+#       email: ""                    # required for letsencrypt / letsencrypt-staging
+#     # Used only when certManager.issuer is "" — bring your own issuer:
 #     certManagerClusterIssuer: ""
 
 # secrets:

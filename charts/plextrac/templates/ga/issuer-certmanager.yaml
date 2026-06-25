@@ -1,0 +1,40 @@
+{{- /*
+Optional chart-managed cert-manager Issuer (namespaced, lives in the release namespace).
+Rendered only when global.ingress.certManager.issuer is set to a built-in value:
+  selfSigned          -> local/dev self-signed cert (browser warnings)
+  letsencrypt         -> public-facing ACME HTTP-01 via Let's Encrypt production
+  letsencrypt-staging -> same against LE staging (untrusted, rate-limit-safe for testing)
+When issuer is "" the chart renders nothing here and the ingress falls back to
+global.ingress.certManagerClusterIssuer (bring-your-own). Requires cert-manager installed.
+*/ -}}
+{{- $cm := .Values.global.ingress.certManager | default dict -}}
+{{- $issuer := $cm.issuer | default "" -}}
+{{- if $issuer -}}
+{{- if not (has $issuer (list "selfSigned" "letsencrypt" "letsencrypt-staging")) -}}
+{{- fail "global.ingress.certManager.issuer must be one of: selfSigned, letsencrypt, letsencrypt-staging (or \"\" to bring your own via certManagerClusterIssuer)" -}}
+{{- end -}}
+{{- if and (ne $issuer "selfSigned") (not $cm.email) -}}
+{{- fail "global.ingress.certManager.email is required when certManager.issuer is letsencrypt or letsencrypt-staging" -}}
+{{- end -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: plextrac-issuer
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+{{- if eq $issuer "selfSigned" }}
+  selfSigned: {}
+{{- else }}
+  acme:
+    server: {{ if eq $issuer "letsencrypt-staging" }}https://acme-staging-v02.api.letsencrypt.org/directory{{ else }}https://acme-v02.api.letsencrypt.org/directory{{ end }}
+    email: {{ $cm.email | quote }}
+    privateKeySecretRef:
+      name: plextrac-acme-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+{{- end }}
+{{- end -}}

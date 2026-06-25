@@ -23,7 +23,8 @@ Notes:
 
 ## Common prerequisites
 
-- Kubernetes cluster access for target namespace
+- Kubernetes cluster access
+- Target namespace already exists. `scripts/setup-registry-credentials.sh` creates it (with the Helm ownership labels the chart adopts), so the install commands below omit `--create-namespace`. If you create the namespace another way, set `global.createNamespace: false` so the chart does not also try to claim it.
 - Helm 3
 - Chart path: `./charts/plextrac`
 - Set `global.ingress.host` to a valid DNS host for your environment
@@ -33,7 +34,6 @@ Base install command:
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f <your-values-file>
 ```
 
@@ -69,7 +69,6 @@ Install example:
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f charts/plextrac/examples/values-external-secrets.yaml
 ```
 
@@ -100,7 +99,6 @@ Install example:
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f charts/plextrac/examples/values-csi-gcp.yaml
 ```
 
@@ -144,7 +142,6 @@ Install example:
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f charts/plextrac/examples/values-manual-secrets.yaml
 ```
 

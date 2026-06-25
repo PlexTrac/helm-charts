@@ -175,23 +175,7 @@ On a managed cluster (GKE/AKS/EKS) the `ingress-nginx-controller` Service gets a
 
 > **On K3s (single VM), the `EXTERNAL-IP` shown is the node's own IP**, not a public address. K3s's built-in load balancer (ServiceLB) assigns the node address, and on a cloud VM that is the **internal/private** IP — the public IP is attached by the provider via 1:1 NAT and is not visible to the OS. Do **not** use that address for public DNS.
 
-The IP to use for DNS is the VM's **provider-assigned external IP**. On GCP, read it from the VM:
-
-```bash
-curl -s -H "Metadata-Flavor: Google" \
-  "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"; echo
-# AWS:  curl -s http://169.254.169.254/latest/meta-data/public-ipv4
-# An empty result means the VM has no external IP — assign one, or there is no public access.
-```
-
-You must also **open the firewall** for inbound `tcp:80,443` to the VM, or nothing external can reach the ingress. On GCP:
-
-```bash
-gcloud compute firewall-rules create plextrac-web \
-  --allow tcp:80,tcp:443 --direction INGRESS --target-tags <vm-network-tag>
-```
-
-Traffic to that external IP NATs to the node and into ingress-nginx, so PlexTrac is reachable even though `kubectl` shows the internal address. **Note the external IP — you need it for DNS in the next step.**
+Instead, use the machine's **public IP** (from your cloud provider) and open inbound `tcp:443` (the application) and `tcp:80`. Port 80 is used **only** by Let's Encrypt for the HTTP-01 certificate challenge — nothing else serves on it, so it is needed only with the `letsencrypt` / `letsencrypt-staging` issuer. Note that IP — you need it for DNS in the next step.
 
 ---
 
@@ -271,12 +255,13 @@ Decide which TLS option you will use before configuring values. Full details are
 
 | Option | Best for | Requires |
 |---|---|---|
-| cert-manager (recommended) | Any public-facing install | cert-manager installed, DNS resolving |
-| Pre-create TLS secret | Bring-your-own certs | Your PEM files |
+| cert-manager — Let's Encrypt (`letsencrypt`) | Public-facing prod/test | cert-manager installed; public DNS pointing at your IP; inbound `:80` reachable |
+| cert-manager — self-signed (`selfSigned`) | Local machine / local k3s / dev | cert-manager installed (browser warnings expected) |
+| Pre-create TLS secret | Bring-your-own or internal-CA certs | Your PEM files |
 | Inline cert in values | Lab/testing only | Your PEM files (ends up in Helm history) |
 | No TLS | Dev/testing only | Nothing |
 
-If using cert-manager, install it now:
+If using cert-manager (either option), install it now:
 
 ```bash
 helm repo add jetstack https://charts.jetstack.io
@@ -288,29 +273,13 @@ helm upgrade --install cert-manager jetstack/cert-manager \
   --wait
 ```
 
-Then create a `ClusterIssuer` for Let's Encrypt:
+The chart creates the Issuer for you — you do **not** need to hand-write a `ClusterIssuer`. Just set `global.ingress.certManager.issuer` in [Phase 3](#phase-3--configure-your-values-file):
 
-```yaml
-# letsencrypt-issuer.yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@mycompany.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-      - http01:
-          ingress:
-            ingressClassName: nginx
-```
+- `selfSigned` — local/dev; no DNS or public reachability needed (cert is untrusted, so browsers warn).
+- `letsencrypt` — public-facing; trusted cert. Also set `certManager.email`. Needs public DNS at your IP and inbound `:80`.
+- `letsencrypt-staging` — same as `letsencrypt` but against Let's Encrypt **staging**. Use this first when testing: LE production has strict rate limits, and repeated failed HTTP-01 attempts can lock you out for hours. Staging certs are untrusted but prove the flow works; switch to `letsencrypt` once it succeeds.
 
-```bash
-kubectl apply -f letsencrypt-issuer.yaml
-```
+To use an issuer you manage yourself instead (DNS-01, a private CA, Vault, etc.), leave `certManager.issuer: ""` and set `certManagerClusterIssuer` to its name — see [Reference: TLS configuration](#reference-tls-configuration).
 
 ---
 
@@ -329,7 +298,9 @@ global:
   ingress:
     host: plextrac.mycompany.com              # from Step 1.3
     tlsSecretName: plextrac-com-tls
-    certManagerClusterIssuer: letsencrypt-prod  # or "" if not using cert-manager
+    certManager:
+      issuer: letsencrypt          # public install. Use "selfSigned" for local, or "" to disable / BYO
+      email: admin@mycompany.com   # required for letsencrypt / letsencrypt-staging
 
 secrets:
   mode: manual
@@ -388,11 +359,12 @@ helm template plextrac ./charts/plextrac -f my-values.yaml | less
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  --create-namespace \
   -f my-values.yaml \
   --wait \
   --timeout 15m
 ```
+
+The namespace was already created (with Helm ownership labels) by the setup script in [Step 2.2](#22--docker-registry-credentials), so `--create-namespace` is not needed here.
 
 `--wait` blocks until all pods are healthy or the timeout is reached. The first install runs the database migration inline (see below), which can take several minutes, so allow a generous `--timeout`. Check progress in another terminal:
 
@@ -597,12 +569,31 @@ kubectl get storageclass
 
 ### Option A — cert-manager (recommended)
 
+The chart creates a namespaced `Issuer` for you and wires it to the ingress. Pick it with `global.ingress.certManager.issuer`:
+
 ```yaml
 global:
   ingress:
     host: plextrac.mycompany.com
     tlsSecretName: plextrac-com-tls
-    certManagerClusterIssuer: letsencrypt-prod
+    certManager:
+      # selfSigned          -> local/dev (untrusted; no DNS or public reachability needed)
+      # letsencrypt         -> public-facing; trusted cert via ACME HTTP-01
+      # letsencrypt-staging -> public-facing; LE staging (untrusted, rate-limit-safe for testing)
+      issuer: letsencrypt
+      email: admin@mycompany.com   # required for letsencrypt / letsencrypt-staging
+```
+
+`letsencrypt`/`letsencrypt-staging` use the ACME **HTTP-01** challenge, so your host must resolve publicly to the ingress IP with inbound `:80` reachable. For internal hosts that can't meet that, use `selfSigned` (or Option B with an internal-CA cert).
+
+**Bring your own issuer:** leave `certManager.issuer: ""` and point `certManagerClusterIssuer` at an `Issuer`/`ClusterIssuer` you created yourself — any solver (DNS-01, a private CA, Vault, etc.):
+
+```yaml
+global:
+  ingress:
+    certManager:
+      issuer: ""
+    certManagerClusterIssuer: my-clusterissuer
 ```
 
 ### Option B — Pre-create the TLS secret
@@ -647,7 +638,7 @@ secrets:
 
 ### Option D — No TLS (dev/testing only)
 
-Leave `certManagerClusterIssuer` blank and `tls.enabled: false`.
+Leave `certManager.issuer` and `certManagerClusterIssuer` blank, and set `tls.enabled: false`.
 
 ---
 
