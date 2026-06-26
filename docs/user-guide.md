@@ -346,6 +346,17 @@ global:
 
 The pull secret in `global.imagePullSecrets` (above) must grant access to whatever registry you point at. To mirror CKEditor too, or to override a single component, see [Reference: Image overrides](#reference-image-overrides).
 
+To run the optional in-cluster Synqly integration service, enable it here (disabled by default):
+
+```yaml
+synqly:
+  enabled: true
+  database:
+    dedicated: false   # reuse the bundled Postgres; set true for a dedicated one
+```
+
+Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Note its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
+
 Preview the rendered output before installing to catch errors early:
 
 ```bash
