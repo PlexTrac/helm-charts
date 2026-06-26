@@ -1,0 +1,17 @@
+{{- if .Values.synqly.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: synqly-embedded
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: synqly-embedded
+  ports:
+  - name: api
+    port: 8000
+    targetPort: 8000
+{{- end }}

@@ -290,3 +290,34 @@ resources:
     requests:
       cpu: 100m
       memory: 256Mi
+
+# Synqly Embedded — optional, in-cluster integration service (internal only, no ingress).
+# Keys are stored in the database (AEAD); intended for non-production. See docs.
+synqly:
+  enabled: false
+  organizationID: plextrac
+  organizationFullName: PlexTrac
+  license: ""                       # synqly embedded license (90-day trial; configure when available)
+  image:
+    registry: quay.io               # overridable, e.g. your registry mirror/proxy
+    repository: synqly/embedded
+    tag: embedded-2026.06.19
+  imagePullSecrets:
+    - name: plextrac-registry-creds
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  admin:
+    username: admin
+    password: ""                    # generated if empty
+  database:
+    dedicated: false                # false = reuse bundled Postgres (auto-creates the DB); true = chart deploys a dedicated Postgres
+    name: synqly
+    host: ""                        # defaults to "postgres" (bundled) or "synqly-postgres" (dedicated)
+    port: 5432
+    storage: 8Gi                    # dedicated Postgres PVC size

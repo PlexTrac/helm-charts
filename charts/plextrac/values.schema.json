@@ -246,6 +246,50 @@
         "contextualScoringService": { "type": "integer", "minimum": 0 },
         "datalakeMaintainer": { "type": "integer", "minimum": 0 }
       }
+    },
+    "synqly": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "organizationID": { "type": "string" },
+        "organizationFullName": { "type": "string" },
+        "license": { "type": "string" },
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": { "type": "string" },
+            "repository": { "type": "string" },
+            "tag": { "type": "string" }
+          }
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" } },
+            "required": ["name"]
+          }
+        },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "resources": { "type": "object" },
+        "admin": {
+          "type": "object",
+          "properties": {
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        },
+        "database": {
+          "type": "object",
+          "properties": {
+            "dedicated": { "type": "boolean" },
+            "name": { "type": "string" },
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "storage": { "type": "string" }
+          }
+        }
+      }
     }
   },
   "required": ["global", "secrets", "images"]

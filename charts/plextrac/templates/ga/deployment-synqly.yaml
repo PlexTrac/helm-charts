@@ -1,0 +1,120 @@
+{{- if .Values.synqly.enabled }}
+{{- $port := .Values.synqly.database.port | default 5432 -}}
+{{- $host := .Values.synqly.database.host | default (ternary "synqly-postgres" "postgres" .Values.synqly.database.dedicated) -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synqly-embedded
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.synqly.replicas | default 1 }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: synqly-embedded
+  template:
+    metadata:
+      labels:
+        app: synqly-embedded
+        {{- include "plextrac.commonLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      {{- with .Values.synqly.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if not .Values.synqly.database.dedicated }}
+      initContainers:
+      - name: create-db
+        image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
+        command: ["sh", "-c"]
+        args:
+        - |
+          until pg_isready -h {{ $host }} -p {{ $port }}; do sleep 3; done
+          psql -h {{ $host }} -p {{ $port }} -tc "SELECT 1 FROM pg_database WHERE datname='{{ .Values.synqly.database.name }}'" | grep -q 1 \
+            || psql -h {{ $host }} -p {{ $port }} -c "CREATE DATABASE {{ .Values.synqly.database.name }}"
+        env:
+        - name: PGUSER
+          valueFrom: { secretKeyRef: { name: application-secrets, key: POSTGRES_USER } }
+        - name: PGPASSWORD
+          valueFrom: { secretKeyRef: { name: application-secrets, key: POSTGRES_PASSWORD } }
+      {{- end }}
+      containers:
+      - name: embedded
+        image: {{ include "plextrac.image" (dict "image" .Values.synqly.image "root" $) }}
+        imagePullPolicy: Always
+        securityContext:
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8000
+        command:
+        - embedded
+        - --organization-name
+        - {{ .Values.synqly.organizationID | quote }}
+        - --organization-fullname
+        - {{ .Values.synqly.organizationFullName | quote }}
+        - --admin
+        - "$(ADMIN_USERNAME)"
+        - --admin-password
+        - "$(ADMIN_PASSWORD)"
+        - --token
+        - "$(ROOT_TOKEN)"
+        - --token-signing-key
+        - "$(TOKEN_SIGNING_KEY)"
+        - --db-host
+        - "$(DB_HOST)"
+        - --db-user
+        - "$(DB_USER)"
+        - --db-pass
+        - "$(DB_PASS)"
+        - --db-name
+        - "$(DB_NAME)"
+        - --db-port
+        - "$(DB_PORT)"
+        - --port
+        - "8000"
+        env:
+        - name: ROOT_TOKEN
+          valueFrom: { secretKeyRef: { name: synqly-root-token, key: token } }
+        - name: TOKEN_SIGNING_KEY
+          valueFrom: { secretKeyRef: { name: synqly-root-token, key: signingKey } }
+        - name: ADMIN_USERNAME
+          valueFrom: { secretKeyRef: { name: synqly-admin, key: username } }
+        - name: ADMIN_PASSWORD
+          valueFrom: { secretKeyRef: { name: synqly-admin, key: password } }
+        - name: DB_HOST
+          value: {{ $host | quote }}
+        - name: DB_PORT
+          value: {{ $port | quote }}
+        - name: DB_NAME
+          value: {{ .Values.synqly.database.name | quote }}
+        {{- if .Values.synqly.database.dedicated }}
+        - name: DB_USER
+          valueFrom: { secretKeyRef: { name: synqly-db, key: username } }
+        - name: DB_PASS
+          valueFrom: { secretKeyRef: { name: synqly-db, key: password } }
+        {{- else }}
+        - name: DB_USER
+          valueFrom: { secretKeyRef: { name: application-secrets, key: POSTGRES_USER } }
+        - name: DB_PASS
+          valueFrom: { secretKeyRef: { name: application-secrets, key: POSTGRES_PASSWORD } }
+        {{- end }}
+        {{- with .Values.synqly.license }}
+        - name: SYNQLY_LICENSE
+          value: {{ . | quote }}
+        {{- end }}
+        livenessProbe:
+          httpGet: { path: /v1/alive, port: 8000 }
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        readinessProbe:
+          httpGet: { path: /v1/ready, port: 8000 }
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.synqly.resources | nindent 10 }}
+      restartPolicy: Always
+{{- end }}

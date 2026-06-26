@@ -1,0 +1,80 @@
+{{- if and .Values.synqly.enabled .Values.synqly.database.dedicated }}
+{{- $ns := include "plextrac.namespace" . }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: synqly-postgres-pvc
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.synqly.database.storage | default "8Gi" }}
+  {{- with .Values.storage.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: synqly-postgres
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: synqly-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synqly-postgres
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: synqly-postgres
+  template:
+    metadata:
+      labels:
+        app: synqly-postgres
+        {{- include "plextrac.commonLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.synqly.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: postgres
+        image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: {{ .Values.synqly.database.name | quote }}
+        - name: POSTGRES_USER
+          valueFrom: { secretKeyRef: { name: synqly-db, key: username } }
+        - name: POSTGRES_PASSWORD
+          valueFrom: { secretKeyRef: { name: synqly-db, key: password } }
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: synqly-postgres-pvc
+{{- end }}

@@ -843,6 +843,28 @@ kubectl -n plextrac rollout restart deployment/plextracnginx deployment/plextrac
 
 ---
 
+## Reference: Synqly (optional)
+
+Synqly Embedded is an optional in-cluster integration service, disabled by default. When enabled, the chart deploys it internally (ClusterIP only, no ingress) and points PlexTrac's `SYNQLY_EMBEDDED_*` variables at it automatically.
+
+```yaml
+synqly:
+  enabled: true
+  organizationID: plextrac
+  organizationFullName: PlexTrac
+  license: ""                 # synqly license; leave blank for the 90-day trial / configure later
+  database:
+    dedicated: false          # false = reuse the bundled Postgres; true = chart deploys a dedicated one
+```
+
+- **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
+- **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
+- **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
+- **Images:** `synqly.image` defaults to `quay.io/synqly/embedded` (override `registry` for your mirror); pulls use `synqly.imagePullSecrets` (default `plextrac-registry-creds`).
+- **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
+
+---
+
 ## Upgrading
 
 ```bash

@@ -194,6 +194,18 @@ spec:
             secretKeyRef:
               key: SENTRY_DSN_BACKEND
               name: shared-secrets
+        {{- if .Values.synqly.enabled }}
+        - name: SYNQLY_EMBEDDED_USER
+          valueFrom:
+            secretKeyRef:
+              name: synqly-admin
+              key: username
+        - name: SYNQLY_EMBEDDED_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: synqly-admin
+              key: password
+        {{- end }}
         envFrom:
         - configMapRef:
             name: env-config
