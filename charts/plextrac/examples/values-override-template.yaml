@@ -102,3 +102,10 @@
 #     registry: registry.mycompany.com   # mirror CKEditor (overrides its pinned default registry)
 #     repository: cke-cs/cs
 #     tag: latest
+
+# Optional in-cluster Synqly integration service (disabled by default).
+# Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
+# synqly:
+#   enabled: true
+#   database:
+#     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one
