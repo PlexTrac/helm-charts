@@ -98,10 +98,6 @@ spec:
         - name: DB_PASS
           valueFrom: { secretKeyRef: { name: application-secrets, key: POSTGRES_PASSWORD } }
         {{- end }}
-        {{- with .Values.synqly.license }}
-        - name: SYNQLY_LICENSE
-          value: {{ . | quote }}
-        {{- end }}
         livenessProbe:
           httpGet: { path: /v1/alive, port: 8000 }
           initialDelaySeconds: 30

@@ -863,7 +863,6 @@ synqly:
   enabled: true
   organizationID: plextrac
   organizationFullName: PlexTrac
-  license: ""                 # synqly license; leave blank for the 90-day trial / configure later
   database:
     dedicated: false          # false = reuse the bundled Postgres; true = chart deploys a dedicated one
 ```

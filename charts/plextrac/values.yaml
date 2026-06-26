@@ -302,7 +302,6 @@ synqly:
   enabled: false
   organizationID: plextrac
   organizationFullName: PlexTrac
-  license: ""                       # synqly embedded license (90-day trial; configure when available)
   imagePullSecrets:
     - name: plextrac-registry-creds
   replicas: 1

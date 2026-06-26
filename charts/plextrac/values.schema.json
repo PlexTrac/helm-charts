@@ -253,7 +253,6 @@
         "enabled": { "type": "boolean" },
         "organizationID": { "type": "string" },
         "organizationFullName": { "type": "string" },
-        "license": { "type": "string" },
         "imagePullSecrets": {
           "type": "array",
           "items": {
