@@ -43,3 +43,8 @@ data:
   # Notifications
   NOTIFICATION_DRY_RUN: "false"
   ENABLE_REQUEST_METRICS: "true"
+{{- if .Values.synqly.enabled }}
+
+  # Synqly (in-cluster)
+  SYNQLY_EMBEDDED_URL: http://synqly-embedded:8000
+{{- end }}

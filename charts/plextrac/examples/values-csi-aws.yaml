@@ -69,6 +69,11 @@ images:
   minioBootstrap:
     repository: plextrac/plextrac-minio-bootstrap
     tag: stable
+  synqly:
+    # On quay.io by default — set registry to your quay proxy/mirror to override.
+    registry: quay.io
+    repository: synqly/embedded
+    tag: embedded-2026.06.19
 
 replicaCounts:
   plextracapi: 3
@@ -79,3 +84,10 @@ replicaCounts:
   integrationWorker: 1
   contextualScoringService: 1
   datalakeMaintainer: 0
+
+# Optional in-cluster Synqly integration service (disabled by default).
+# Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
+# synqly:
+#   enabled: true
+#   database:
+#     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one

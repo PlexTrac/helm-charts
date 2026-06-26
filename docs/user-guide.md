@@ -346,6 +346,17 @@ global:
 
 The pull secret in `global.imagePullSecrets` (above) must grant access to whatever registry you point at. To mirror CKEditor too, or to override a single component, see [Reference: Image overrides](#reference-image-overrides).
 
+To run the optional in-cluster Synqly integration service, enable it here (disabled by default):
+
+```yaml
+synqly:
+  enabled: true
+  database:
+    dedicated: false   # reuse the bundled Postgres; set true for a dedicated one
+```
+
+Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Note its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
+
 Preview the rendered output before installing to catch errors early:
 
 ```bash
@@ -840,6 +851,30 @@ Then restart the pods that read `CLIENT_DOMAIN_NAME`:
 ```bash
 kubectl -n plextrac rollout restart deployment/plextracnginx deployment/plextracapi
 ```
+
+---
+
+## Reference: Synqly (optional)
+
+Synqly Embedded is an optional in-cluster integration service, disabled by default. When enabled, the chart deploys it internally (ClusterIP only, no ingress) and points PlexTrac's `SYNQLY_EMBEDDED_*` variables at it automatically.
+
+```yaml
+synqly:
+  enabled: true
+  organizationID: plextrac          # slug only: [a-z0-9_-.], no spaces or "@"
+  organizationFullName: PlexTrac
+  admin:
+    username: you@example.com       # REQUIRED: Synqly's org admin must be an email address
+  database:
+    dedicated: false          # false = reuse the bundled Postgres; true = chart deploys a dedicated one
+```
+
+- **Admin & org name:** `organizationID` must be a slug (`[a-z0-9_-.]`), and `admin.username` must be an **email address** — Synqly rejects a non-email admin and a non-slug org name. The chart fails fast at install if `admin.username` isn't an email.
+- **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
+- **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
+- **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
+- **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `plextrac-registry-creds`).
+- **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
 
 ---
 
