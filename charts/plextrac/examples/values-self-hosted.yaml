@@ -74,6 +74,11 @@ images:
   minioBootstrap:
     repository: plextrac/plextrac-minio-bootstrap
     tag: stable
+  synqly:
+    # On quay.io by default — set registry to your quay proxy/mirror to override.
+    registry: quay.io
+    repository: synqly/embedded
+    tag: embedded-2026.06.19
 
 replicaCounts:
   plextracapi: 3

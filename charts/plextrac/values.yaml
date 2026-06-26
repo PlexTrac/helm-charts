@@ -188,6 +188,11 @@ images:
   minioBootstrap:
     repository: plextrac/plextrac-minio-bootstrap
     tag: stable
+  synqly:
+    # On quay.io by default — set registry to your quay proxy/mirror to override.
+    registry: quay.io
+    repository: synqly/embedded
+    tag: embedded-2026.06.19
 
 replicaCounts:
   plextracapi: 3
@@ -298,10 +303,6 @@ synqly:
   organizationID: plextrac
   organizationFullName: PlexTrac
   license: ""                       # synqly embedded license (90-day trial; configure when available)
-  image:
-    registry: quay.io               # overridable, e.g. your registry mirror/proxy
-    repository: synqly/embedded
-    tag: embedded-2026.06.19
   imagePullSecrets:
     - name: plextrac-registry-creds
   replicas: 1

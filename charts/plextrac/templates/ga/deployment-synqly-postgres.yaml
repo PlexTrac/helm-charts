@@ -51,10 +51,7 @@ spec:
         app: synqly-postgres
         {{- include "plextrac.commonLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.synqly.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "plextrac.synqly.imagePullSecrets" . | nindent 6 }}
       containers:
       - name: postgres
         image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}

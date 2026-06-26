@@ -102,6 +102,10 @@
 #     registry: registry.mycompany.com   # mirror CKEditor (overrides its pinned default registry)
 #     repository: cke-cs/cs
 #     tag: latest
+#   synqly:
+#     registry: registry.mycompany.com   # your quay proxy/mirror (Synqly's image is on quay.io)
+#     repository: synqly/embedded
+#     tag: embedded-2026.06.19
 
 # Optional in-cluster Synqly integration service (disabled by default).
 # Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.

@@ -254,14 +254,6 @@
         "organizationID": { "type": "string" },
         "organizationFullName": { "type": "string" },
         "license": { "type": "string" },
-        "image": {
-          "type": "object",
-          "properties": {
-            "registry": { "type": "string" },
-            "repository": { "type": "string" },
-            "tag": { "type": "string" }
-          }
-        },
         "imagePullSecrets": {
           "type": "array",
           "items": {
