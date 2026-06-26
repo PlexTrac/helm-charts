@@ -300,7 +300,7 @@ resources:
 # Keys are stored in the database (AEAD); intended for non-production. See docs.
 synqly:
   enabled: false
-  organizationID: plextrac
+  organizationID: plextrac          # slug only: [a-z0-9_-.], no spaces or "@"
   organizationFullName: PlexTrac
   imagePullSecrets:
     - name: plextrac-registry-creds
@@ -313,7 +313,7 @@ synqly:
       cpu: "1"
       memory: 1Gi
   admin:
-    username: admin
+    username: ""                    # REQUIRED when enabled: must be an email address (Synqly org admin)
     password: ""                    # generated if empty
   database:
     dedicated: false                # false = reuse bundled Postgres (auto-creates the DB); true = chart deploys a dedicated Postgres

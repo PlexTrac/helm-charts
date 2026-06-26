@@ -861,12 +861,15 @@ Synqly Embedded is an optional in-cluster integration service, disabled by defau
 ```yaml
 synqly:
   enabled: true
-  organizationID: plextrac
+  organizationID: plextrac          # slug only: [a-z0-9_-.], no spaces or "@"
   organizationFullName: PlexTrac
+  admin:
+    username: you@example.com       # REQUIRED: Synqly's org admin must be an email address
   database:
     dedicated: false          # false = reuse the bundled Postgres; true = chart deploys a dedicated one
 ```
 
+- **Admin & org name:** `organizationID` must be a slug (`[a-z0-9_-.]`), and `admin.username` must be an **email address** — Synqly rejects a non-email admin and a non-slug org name. The chart fails fast at install if `admin.username` isn't an email.
 - **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
 - **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
