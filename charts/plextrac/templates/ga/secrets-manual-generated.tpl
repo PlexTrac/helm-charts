@@ -68,7 +68,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "regcred-dorf" .Values.secrets.manual.generatedSecrets.registryCredentials.name }}
+  name: {{ default "plextrac-registry-creds" .Values.secrets.manual.generatedSecrets.registryCredentials.name }}
   namespace: {{ $namespace }}
 type: kubernetes.io/dockerconfigjson
 stringData:

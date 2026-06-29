@@ -40,7 +40,7 @@ secrets:
       remoteKey: ""
     registryCredentials:
       enabled: false
-      targetSecretName: regcred-dorf
+      targetSecretName: plextrac-registry-creds
       remoteKey: ""
     tls:
       enabled: false
@@ -146,7 +146,7 @@ secrets:
         data: {}
       registryCredentials:
         enabled: false   # Set to true and provide dockerconfigjson to pull PlexTrac images
-        name: regcred-dorf
+        name: plextrac-registry-creds
         dockerconfigjson: ""
       tls:
         enabled: false

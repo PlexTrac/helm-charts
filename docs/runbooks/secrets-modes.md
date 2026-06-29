@@ -29,13 +29,16 @@ Notes:
 - Chart path: `./charts/plextrac`
 - Set `global.ingress.host` to a valid DNS host for your environment
 
-Base install command:
+Base install command (use the same flags as the [user-guide Phase 4](../user-guide.md#phase-4--install); `--timeout 15m` because the first install runs DB migrations inline):
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  -f <your-values-file>
+  -f <your-values-file> \
+  --wait --timeout 15m
 ```
+
+> The per-mode install snippets below are abbreviated — use the same `--wait --timeout 15m` flags shown here.
 
 ## Mode 1: `externalSecrets`
 

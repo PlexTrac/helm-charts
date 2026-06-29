@@ -14,6 +14,8 @@ See [docs/user-guide.md](docs/user-guide.md) for the full phased installation gu
 
 ## Quick start (K3s)
 
+> Prerequisites on the host you run this from: **Helm 3.10+** and **`jq`** (required by the registry script in step 4 — `apt install jq` / `dnf install jq` / `brew install jq`). `kubectl` is bundled with K3s.
+
 ```bash
 # 1. Install K3s (disable Traefik — PlexTrac uses NGINX; write a non-root-readable kubeconfig)
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -

@@ -16,8 +16,9 @@
 10. [Reference: Image overrides](#reference-image-overrides)
 11. [Reference: Replica counts](#reference-replica-counts)
 12. [Reference: Overriding values](#reference-overriding-values)
-13. [Upgrading](#upgrading)
-14. [Troubleshooting](#troubleshooting)
+13. [Reference: Synqly (optional)](#reference-synqly-optional)
+14. [Upgrading](#upgrading)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -42,8 +43,8 @@ Read through this checklist before touching any `helm` command. Installing the c
 | redis | StatefulSet | 1 |
 | postgres | Deployment | 1 |
 | minio | Deployment | 1 |
-| bootstrap-minio | Job | — |
-| migrations-and-etl | Job | — |
+| migrations-and-etl | Job (release resource) | — |
+| bootstrap-minio | Job (post-install hook) | — |
 
 > `datalake-maintainer` ships **disabled** (0 replicas) by default — seeing it with no pods is expected and does not block startup. `migrations-and-etl` runs as a normal Job during install (its name includes the release revision, e.g. `migrations-and-etl-1`) and migrates the database before the API reports healthy. `bootstrap-minio` is a Helm **post-install/post-upgrade hook**, so it appears only *after* the main workloads are running. See [Phase 4](#phase-4--install).
 
@@ -56,16 +57,21 @@ Read through this checklist before touching any `helm` command. Installing the c
 | Kubernetes | 1.25 |
 | Helm | 3.10 |
 | NGINX Ingress Controller | any current release |
+| `jq` | any — **required** by `scripts/setup-registry-credentials.sh` (Phase 2.2) |
 
 > All Ingress resources use `ingressClassName: nginx`. Other ingress controllers are not supported without changes to annotations and ingress class values.
+
+> `jq` is not preinstalled on fresh Ubuntu/Debian/RHEL. Install it before Phase 2.2: `apt install jq` / `dnf install jq` / `brew install jq`.
 
 ### Install Helm
 
 The chart requires Helm 3.10 or newer. If Helm is not already on the machine you run installs from, install it before Phase 1. (`kubectl` is bundled with K3s; on managed clusters install it through your provider's flow.)
 
 ```bash
-# Official installer (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Official installer (Linux/macOS). The installer pulls the latest Helm by default;
+# pin DESIRED_VERSION to a 3.10+ release you have tested for reproducible installs.
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+  | DESIRED_VERSION=v3.16.4 bash
 
 helm version   # confirm v3.10.0 or newer
 ```
@@ -184,13 +190,15 @@ Instead, use the machine's **public IP** (from your cloud provider) and open inb
 Create an A record pointing your chosen hostname to the ingress LoadBalancer IP:
 
 ```
-plextrac.mycompany.com  →  <EXTERNAL-IP from Step 1.2>
+plextrac.mycompany.com  →  <your ingress IP from Step 1.2>
 ```
+
+> Use the IP Step 1.2 told you to use: on **K3s / single VM** that's the machine's **public** IP (the `EXTERNAL-IP` from `kubectl get svc` is the node's private address); on **GKE/AKS/EKS** it's the LoadBalancer `EXTERNAL-IP`.
 
 For local/lab installs without DNS, add an entry to `/etc/hosts` on any machine that needs to reach PlexTrac:
 
 ```
-<EXTERNAL-IP>  plextrac.mycompany.com
+<your ingress IP from Step 1.2>  plextrac.mycompany.com
 ```
 
 > DNS propagation can take minutes to hours depending on your provider. You can proceed with configuration while waiting, but the final smoke test requires DNS to resolve.
@@ -219,7 +227,7 @@ cp .env.example .env.local
 
 ### 2.2 — Docker registry credentials
 
-PlexTrac images require authentication. Fill in your registry credentials in `.env.local`, then run the setup script — it creates the Kubernetes pull secrets and prints the `my-values.yaml` snippet to paste in:
+PlexTrac images require authentication. Fill in your registry credentials in `.env.local`, then run the setup script — it creates the Kubernetes pull secrets and prints the `my-values.yaml` snippet to paste in. **The script requires `jq`** and exits immediately if it is missing (`apt install jq` / `dnf install jq` / `brew install jq`).
 
 ```bash
 # Fill in DOCKER_REGISTRY, DOCKER_USERNAME, DOCKER_PASSWORD in .env.local first
@@ -229,8 +237,9 @@ PlexTrac images require authentication. Fill in your registry credentials in `.e
 Options:
 
 ```bash
-./scripts/setup-registry-credentials.sh --namespace plextrac   # default namespace
-./scripts/setup-registry-credentials.sh --dry-run              # preview without creating
+./scripts/setup-registry-credentials.sh --namespace plextrac     # default namespace
+./scripts/setup-registry-credentials.sh --release-name plextrac  # must match the helm release name (default: plextrac)
+./scripts/setup-registry-credentials.sh --dry-run                # preview without creating
 ./scripts/setup-registry-credentials.sh --env-file /path/to/other.env
 ```
 
@@ -351,11 +360,13 @@ To run the optional in-cluster Synqly integration service, enable it here (disab
 ```yaml
 synqly:
   enabled: true
+  admin:
+    username: you@example.com   # REQUIRED — must be an email address
   database:
-    dedicated: false   # reuse the bundled Postgres; set true for a dedicated one
+    dedicated: false            # reuse the bundled Postgres; set true for a dedicated one
 ```
 
-Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Note its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
+`admin.username` is **required** when `synqly.enabled: true` and must be an email address. In the default `manual` secrets mode the chart fails fast — even at `helm template` — if it is missing or not an email, so the preview/install below will abort until you set it. Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
 
 Preview the rendered output before installing to catch errors early:
 
@@ -375,7 +386,7 @@ helm upgrade --install plextrac ./charts/plextrac \
   --timeout 15m
 ```
 
-The namespace was already created (with Helm ownership labels) by the setup script in [Step 2.2](#22--docker-registry-credentials), so `--create-namespace` is not needed here.
+**Namespace:** `--create-namespace` is intentionally omitted. The setup script in [Step 2.2](#22--docker-registry-credentials) already created the `plextrac` namespace and stamped it with Helm ownership labels, and the chart's `global.createNamespace: true` (default) declares the namespace as a release resource that adopts it. If you skip the setup script or create the namespace another way (e.g. plain `kubectl create namespace`), that adoption fails with `invalid ownership metadata`; in that case either let the script create it, or set `global.createNamespace: false` and create the namespace yourself before installing.
 
 `--wait` blocks until all pods are healthy or the timeout is reached. The first install runs the database migration inline (see below), which can take several minutes, so allow a generous `--timeout`. Check progress in another terminal:
 
@@ -424,7 +435,16 @@ helm status plextrac -n plextrac
 kubectl -n plextrac get pods
 ```
 
-All pods should reach `Running` or `Completed` status.
+All pods should reach `Running` with full readiness (e.g. `plextracapi` shows `1/1`, not just `Running`). On a **fresh install `plextracapi` can take several minutes to become Ready** — its startup probe holds it un-Ready (up to ~10 min) until the database migration finishes, so `Running` but `0/1` early on is expected, not a failure.
+
+### Check the database migration completed
+
+```bash
+kubectl -n plextrac get jobs
+kubectl -n plextrac logs job/migrations-and-etl-<revision> --tail=20   # <revision> = release revision (e.g. -1 on first install)
+```
+
+`migrations-and-etl-<revision>` should show `COMPLETIONS 1/1`. This is the gating, most failure-prone resource — until it completes, `plextracapi` never goes Ready.
 
 ### Check secrets were created
 
@@ -432,7 +452,7 @@ All pods should reach `Running` or `Completed` status.
 kubectl -n plextrac get secrets
 ```
 
-You should see at minimum `application-secrets` and `shared-secrets`.
+You should see at minimum `application-secrets` and `shared-secrets` (in `manual` mode).
 
 ### Check ingress
 
@@ -444,11 +464,18 @@ The `ADDRESS` field is populated once the ingress controller assigns an IP.
 
 ### Smoke test
 
+Confirm the app is healthy **from inside the cluster** first (independent of DNS/TLS), then test the public endpoint:
+
 ```bash
+# In-cluster — isolates app health from ingress/DNS/TLS
+kubectl -n plextrac port-forward deploy/plextracapi 4350:4350 &
+curl -s http://localhost:4350/api/v2/health/full; kill %1
+
+# Public endpoint — requires DNS to resolve and TLS to be valid
 curl -I https://plextrac.mycompany.com/api/v2/health/full
 ```
 
-Expected: `HTTP/2 200`
+Expected: the in-cluster check returns a healthy response and the public check returns `HTTP/2 200`. If the in-cluster check is healthy but the public one fails, the problem is ingress/DNS/TLS, not the app — see [Troubleshooting](#troubleshooting).
 
 ---
 
@@ -474,9 +501,11 @@ secrets:
           CKEDITOR_SERVER_LICENSE_KEY: "your-key"
 ```
 
-**How auto-generation works:**
-- On install: any required key not in `stringData` or `data` gets a random 40-character alphanumeric value
-- On upgrade: Helm looks up the existing secret in the cluster and reuses its current value — passwords are never rotated automatically
+**How auto-generation works (manual mode only):**
+- On install: any required key not in `stringData` or `data` gets a random 32-character alphanumeric value (20 characters for `CLOUD_STORAGE_ACCESS_KEY`).
+- On upgrade: Helm looks up the existing in-cluster secret and reuses its current value — passwords are never rotated automatically.
+- **Caveat:** preservation relies on a live-cluster `lookup`, so it only works for a real `helm upgrade` against the cluster. `helm template`, `--dry-run`, or CI without cluster access cannot see the existing secret and will **regenerate** every auto-generated value in the rendered output (rotating DB/Redis/JWT/MinIO credentials). Don't pipe `helm template` output straight to `kubectl apply` for an existing release.
+- This auto-generation/preservation applies to `manual` mode only — in `externalSecrets`/`csi` modes the chart does **not** generate secrets (see those sections).
 
 **Static username/database defaults (matching the `docker-compose.yml` reference deployment):**
 
@@ -486,7 +515,7 @@ secrets:
 | `CB_API_USER` | `ptapiuser` |
 | `CB_BACKUP_USER` | `ptbackupuser` |
 | `CB_BUCKET` | `reportMe` |
-| `POSTGRES_USER` | `postgres` |
+| `POSTGRES_USER` | `internalonly` |
 | `PG_CORE_DB` | `core` |
 | `PG_CORE_ADMIN_USER` | `core_admin` |
 | `PG_CORE_RO_USER` | `core_ro` |
@@ -518,6 +547,8 @@ secrets:
 
 See `charts/plextrac/examples/values-external-secrets.yaml` for a complete example.
 
+> **Required keys:** in ESO mode the chart does **not** generate secrets — your secret store must already contain the full `application-secrets` key set (all keys) **and** the `shared-secrets` keys before install, or pods crash-loop on startup. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` and Section C of `.env.example`.
+
 ### CSI Secrets Store mode
 
 Use when Secrets Store CSI Driver is installed with a provider (AWS, GCP, Azure, Vault).
@@ -543,6 +574,8 @@ secrets:
 ```
 
 See `charts/plextrac/examples/values-csi-aws.yaml` and `values-csi-gcp.yaml` for provider-specific examples.
+
+> **Required keys:** like ESO mode, CSI mode does **not** generate secrets — your provider store must contain the full `application-secrets` and `shared-secrets` key sets before install. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` and Section C of `.env.example`.
 
 For full details on all three modes, see [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
 
@@ -645,11 +678,19 @@ secrets:
           ...
 ```
 
+> When `tls.enabled: true`, **both `crt` and `key` are required** — the chart aborts the install (and `helm template`) if either is empty.
+>
 > **Security note:** Certificates stored inline end up in Helm release history. Use cert-manager or pre-create the secret if this is a concern.
 
-### Option D — No TLS (dev/testing only)
+### Option E — TLS via External Secrets (ESO)
 
-Leave `certManager.issuer` and `certManagerClusterIssuer` blank, and set `tls.enabled: false`.
+In `externalSecrets` mode, enable `secrets.externalSecrets.tls` and point its `remoteKey` at the certificate in your store. The remote value **must be a PKCS#12 bundle** — the chart converts it to `tls.crt`/`tls.key`. A PEM payload yields a broken/empty TLS secret. See [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md) and `.env.example`.
+
+### Option D — No managed certificate (dev/testing only)
+
+> **The chart does not support true plaintext-only HTTP today.** The ingress always renders a `tls:` block referencing `global.ingress.tlsSecretName`, regardless of these settings.
+
+Leave `certManager.issuer` and `certManagerClusterIssuer` blank and set `tls.enabled: false`. No TLS secret is created, so **ingress-nginx serves its own default self-signed certificate** for the host (browsers warn; there is no plaintext path). Use Option A/B/C/E for a real cert — this is only for throwaway dev where a self-signed warning is acceptable.
 
 ---
 
@@ -869,7 +910,7 @@ synqly:
     dedicated: false          # false = reuse the bundled Postgres; true = chart deploys a dedicated one
 ```
 
-- **Admin & org name:** `organizationID` must be a slug (`[a-z0-9_-.]`), and `admin.username` must be an **email address** — Synqly rejects a non-email admin and a non-slug org name. The chart fails fast at install if `admin.username` isn't an email.
+- **Admin & org name:** `organizationID` must be a slug (`[a-z0-9_-.]`), and `admin.username` must be an **email address** — Synqly rejects a non-email admin and a non-slug org name. In `manual` mode the chart fails fast at install if `admin.username` isn't an email. In `externalSecrets`/`csi` modes the chart does **not** validate it and does **not** create `synqly-admin`/`synqly-root-token` — you provide those secrets yourself, and a non-email admin will instead surface as the Synqly pod failing to start.
 - **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
 - **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.

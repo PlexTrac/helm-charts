@@ -42,8 +42,8 @@
 #       stageProperty: ga
 #     registryCredentials:
 #       enabled: true
-#       targetSecretName: regcred-dorf
-#       remoteKey: regcred-dorf
+#       targetSecretName: plextrac-registry-creds
+#       remoteKey: plextrac-registry-creds
 #     tls:
 #       enabled: true
 #       targetSecretName: plextrac-com-tls
@@ -78,7 +78,7 @@
 #         data: {}
 #       registryCredentials:
 #         enabled: true
-#         name: regcred-dorf
+#         name: plextrac-registry-creds
 #         dockerconfigjson: ""
 #       tls:
 #         enabled: false
