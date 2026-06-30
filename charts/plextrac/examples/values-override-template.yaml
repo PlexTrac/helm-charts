@@ -14,7 +14,7 @@
 #     # Required for valid Ingress objects.
 #     host: example.plextrac.com
 #     # TLS secret used by plextracnginx ingress.
-#     tlsSecretName: plextrac-com-tls
+#     tlsSecretName: internal-tls
 #     # cert-manager TLS. issuer: letsencrypt | letsencrypt-staging | selfSigned | "" (none / BYO)
 #     certManager:
 #       issuer: ""
@@ -42,12 +42,12 @@
 #       stageProperty: ga
 #     registryCredentials:
 #       enabled: true
-#       targetSecretName: plextrac-registry-creds
-#       remoteKey: plextrac-registry-creds
+#       targetSecretName: internal-registry-creds
+#       remoteKey: internal-registry-creds
 #     tls:
 #       enabled: true
-#       targetSecretName: plextrac-com-tls
-#       remoteKey: plextrac-com-tls
+#       targetSecretName: internal-tls
+#       remoteKey: internal-tls
 #
 #   # Secrets Store CSI Driver mode
 #   csi:
@@ -78,11 +78,11 @@
 #         data: {}
 #       registryCredentials:
 #         enabled: true
-#         name: plextrac-registry-creds
+#         name: internal-registry-creds
 #         dockerconfigjson: ""
 #       tls:
 #         enabled: false
-#         name: plextrac-com-tls
+#         name: internal-tls
 #         crt: ""
 #         key: ""
 #       # Optional per-deployment additional secret objects.

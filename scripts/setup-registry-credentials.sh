@@ -111,7 +111,7 @@ if [[ -z "${DOCKER_REGISTRY:-}" || -z "${DOCKER_USERNAME:-}" || -z "${DOCKER_PAS
 fi
 
 PLEXTRAC_JSON=$(make_dockerconfigjson "$DOCKER_REGISTRY" "$DOCKER_USERNAME" "$DOCKER_PASSWORD")
-create_or_replace_secret "plextrac-registry-creds" "$PLEXTRAC_JSON"
+create_or_replace_secret "internal-registry-creds" "$PLEXTRAC_JSON"
 
 # ── CKEditor registry (optional) ────────────────────────────────────────────
 CKEDITOR_SECRET_NAME=""
@@ -135,7 +135,7 @@ echo "────────────────────────�
 echo ""
 echo "global:"
 echo "  imagePullSecrets:"
-echo "    - name: plextrac-registry-creds"
+echo "    - name: internal-registry-creds"
 if [[ -n "$CKEDITOR_SECRET_NAME" ]]; then
   echo "    - name: ckeditor-registry-creds"
 fi

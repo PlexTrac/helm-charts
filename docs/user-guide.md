@@ -243,7 +243,7 @@ Options:
 ./scripts/setup-registry-credentials.sh --env-file /path/to/other.env
 ```
 
-The script creates `plextrac-registry-creds` (and `ckeditor-registry-creds` if CKEditor credentials are set), then prints the exact `global.imagePullSecrets` and `registryCredentials` block to add to `my-values.yaml`.
+The script creates `internal-registry-creds` (and `ckeditor-registry-creds` if CKEditor credentials are set), then prints the exact `global.imagePullSecrets` and `registryCredentials` block to add to `my-values.yaml`.
 
 > **Security note:** The `dockerconfigjson` blob is base64-encoded (not encrypted). Treat your values file like a credential, or supply registry creds via a separate `-f secrets.yaml` file excluded from version control.
 
@@ -306,7 +306,7 @@ Edit `my-values.yaml`. At minimum, set these fields using the values you gathere
 global:
   ingress:
     host: plextrac.mycompany.com              # from Step 1.3
-    tlsSecretName: plextrac-com-tls
+    tlsSecretName: internal-tls
     certManager:
       issuer: letsencrypt          # public install. Use "selfSigned" for local, or "" to disable / BYO
       email: admin@mycompany.com   # required for letsencrypt / letsencrypt-staging
@@ -329,19 +329,19 @@ secrets:
         enabled: false                        # set to true if providing cert inline
 ```
 
-If your images require a pull secret, reference it under `global.imagePullSecrets`. This can be the secret created by the setup script in [Step 2.2](#22--docker-registry-credentials) (named `plextrac-registry-creds`), or any existing `kubernetes.io/dockerconfigjson` secret in the namespace — the name just has to match a secret that exists. If you ran the setup script, paste the snippet it printed instead of writing this by hand:
+If your images require a pull secret, reference it under `global.imagePullSecrets`. This can be the secret created by the setup script in [Step 2.2](#22--docker-registry-credentials) (named `internal-registry-creds`), or any existing `kubernetes.io/dockerconfigjson` secret in the namespace — the name just has to match a secret that exists. If you ran the setup script, paste the snippet it printed instead of writing this by hand:
 
 ```yaml
 global:
   imagePullSecrets:
-    - name: plextrac-registry-creds      # must match the secret you created
+    - name: internal-registry-creds      # must match the secret you created
 
 secrets:
   manual:
     generatedSecrets:
       registryCredentials:
         enabled: true
-        name: plextrac-registry-creds
+        name: internal-registry-creds
         dockerconfigjson: '<paste your dockerconfigjson blob here>'
 ```
 
@@ -619,7 +619,7 @@ The chart creates a namespaced `Issuer` for you and wires it to the ingress. Pic
 global:
   ingress:
     host: plextrac.mycompany.com
-    tlsSecretName: plextrac-com-tls
+    tlsSecretName: internal-tls
     certManager:
       # selfSigned          -> local/dev (untrusted; no DNS or public reachability needed)
       # letsencrypt         -> public-facing; trusted cert via ACME HTTP-01
@@ -645,7 +645,7 @@ global:
 Create the secret before installing, then reference it by name:
 
 ```bash
-kubectl -n plextrac create secret tls plextrac-com-tls \
+kubectl -n plextrac create secret tls internal-tls \
   --cert=./fullchain.pem \
   --key=./privkey.pem
 ```
@@ -653,7 +653,7 @@ kubectl -n plextrac create secret tls plextrac-com-tls \
 ```yaml
 global:
   ingress:
-    tlsSecretName: plextrac-com-tls
+    tlsSecretName: internal-tls
 secrets:
   manual:
     generatedSecrets:
@@ -669,7 +669,7 @@ secrets:
     generatedSecrets:
       tls:
         enabled: true
-        name: plextrac-com-tls
+        name: internal-tls
         crt: |
           -----BEGIN CERTIFICATE-----
           ...
@@ -750,14 +750,14 @@ Every Deployment, StatefulSet, and Job will pick up `global.imagePullSecrets` au
 ```yaml
 global:
   imagePullSecrets:
-    - name: plextrac-registry-creds
+    - name: internal-registry-creds
 
 secrets:
   manual:
     generatedSecrets:
       registryCredentials:
         enabled: true
-        name: plextrac-registry-creds
+        name: internal-registry-creds
         dockerconfigjson: '{"auths":{"registry.mycompany.com":{"username":"myuser","password":"mypassword","auth":"bXl1c2VyOm15cGFzc3dvcmQ="}}}'
 ```
 
@@ -792,12 +792,12 @@ secrets:
   externalSecrets:
     registryCredentials:
       enabled: true
-      targetSecretName: plextrac-registry-creds
+      targetSecretName: internal-registry-creds
       remoteKey: plextrac/registry-credentials
 
 global:
   imagePullSecrets:
-    - name: plextrac-registry-creds
+    - name: internal-registry-creds
 ```
 
 ---
@@ -914,7 +914,7 @@ synqly:
 - **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
 - **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
-- **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `plextrac-registry-creds`).
+- **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `internal-registry-creds`).
 - **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
 
 ---
@@ -998,7 +998,7 @@ kubectl -n plextrac describe pod <pod> | grep -A5 Events
 ```
 
 - Confirm each `images.<component>.repository` points at a registry you can reach (see [Reference: Image overrides](#reference-image-overrides)).
-- Confirm the secret named in `global.imagePullSecrets` exists in the namespace and matches the name you created. The setup script creates `plextrac-registry-creds`; the name in your values file must match it exactly:
+- Confirm the secret named in `global.imagePullSecrets` exists in the namespace and matches the name you created. The setup script creates `internal-registry-creds`; the name in your values file must match it exactly:
   ```bash
   kubectl -n plextrac get secret
   ```

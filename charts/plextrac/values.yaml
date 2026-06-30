@@ -10,7 +10,7 @@ global:
     registry: ""
   ingress:
     host: ""
-    tlsSecretName: plextrac-com-tls
+    tlsSecretName: internal-tls
     # cert-manager integration — choose how the TLS certificate is issued.
     certManager:
       # ""                    = none / bring-your-own (use certManagerClusterIssuer below)
@@ -40,11 +40,11 @@ secrets:
       remoteKey: ""
     registryCredentials:
       enabled: false
-      targetSecretName: plextrac-registry-creds
+      targetSecretName: internal-registry-creds
       remoteKey: ""
     tls:
       enabled: false
-      targetSecretName: plextrac-com-tls
+      targetSecretName: internal-tls
       remoteKey: ""
   csi:
     secretProviderClass:
@@ -146,11 +146,11 @@ secrets:
         data: {}
       registryCredentials:
         enabled: false   # Set to true and provide dockerconfigjson to pull PlexTrac images
-        name: plextrac-registry-creds
+        name: internal-registry-creds
         dockerconfigjson: ""
       tls:
         enabled: false
-        name: plextrac-com-tls
+        name: internal-tls
         crt: ""
         key: ""
       additional: []
@@ -303,7 +303,7 @@ synqly:
   organizationID: plextrac          # slug only: [a-z0-9_-.], no spaces or "@"
   organizationFullName: PlexTrac
   imagePullSecrets:
-    - name: plextrac-registry-creds
+    - name: internal-registry-creds
   replicas: 1
   resources:
     requests:

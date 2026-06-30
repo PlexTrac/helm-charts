@@ -9,7 +9,7 @@ global:
   imagePullSecrets: []
   ingress:
     host: plextrac.mycompany.com
-    tlsSecretName: plextrac-com-tls
+    tlsSecretName: internal-tls
     certManager:
       issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
       email: ""      # required for letsencrypt / letsencrypt-staging

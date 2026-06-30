@@ -68,7 +68,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "plextrac-registry-creds" .Values.secrets.manual.generatedSecrets.registryCredentials.name }}
+  name: {{ default "internal-registry-creds" .Values.secrets.manual.generatedSecrets.registryCredentials.name }}
   namespace: {{ $namespace }}
 type: kubernetes.io/dockerconfigjson
 stringData:
@@ -79,7 +79,7 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ default "plextrac-com-tls" .Values.secrets.manual.generatedSecrets.tls.name }}
+  name: {{ default "internal-tls" .Values.secrets.manual.generatedSecrets.tls.name }}
   namespace: {{ $namespace }}
 type: kubernetes.io/tls
 stringData:
