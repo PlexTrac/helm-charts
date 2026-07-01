@@ -23,8 +23,8 @@ secrets:
       remoteKey: regcred-dorf
     tls:
       enabled: true
-      targetSecretName: plextrac-com-tls
-      remoteKey: plextrac-com-tls
+      targetSecretName: internal-tls
+      remoteKey: internal-tls
 
 images:
   backend:

@@ -23,7 +23,7 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- end -}}
 
 {{- define "plextrac.ingressTlsSecretName" -}}
-{{- default "plextrac-com-tls" .Values.global.ingress.tlsSecretName -}}
+{{- default "internal-tls" .Values.global.ingress.tlsSecretName -}}
 {{- end -}}
 
 {{- define "plextrac.validateSecretMode" -}}
