@@ -30,7 +30,7 @@ spec:
       labels:
         {{- include "plextrac.commonLabels" . | nindent 8 }}
     spec:
-      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
+      {{- include "plextrac.keycloak.imagePullSecrets" . | nindent 6 }}
       restartPolicy: Never
       initContainers:
       # Realm setup talks to Keycloak's admin API, so wait until Keycloak is serving traffic.

@@ -340,7 +340,7 @@ keycloak:
   host: ""                          # REQUIRED when enabled: browser-facing auth hostname (e.g. auth.mycompany.com)
   replicas: 1
   admin:
-    username: keycloak-admin@plextrac.com   # Keycloak bootstrap admin
+    username: admin@mycompany.com   # Keycloak bootstrap admin
     password: ""                    # generated if empty
   tlsSecretName: keycloak-tls
   # TLS for the keycloak ingress. Three ways to provide the keycloak-tls secret:

@@ -17,8 +17,9 @@
 11. [Reference: Replica counts](#reference-replica-counts)
 12. [Reference: Overriding values](#reference-overriding-values)
 13. [Reference: Synqly (optional)](#reference-synqly-optional)
-14. [Upgrading](#upgrading)
-15. [Troubleshooting](#troubleshooting)
+14. [Reference: Keycloak (optional)](#reference-keycloak-optional)
+15. [Upgrading](#upgrading)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -943,7 +944,7 @@ keycloak:
   enabled: true
   host: auth.mycompany.com    # REQUIRED — browser-facing auth hostname
   admin:
-    username: keycloak-admin@plextrac.com
+    username: admin@mycompany.com
   certManager:
     issuer: letsencrypt       # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
     email: admin@mycompany.com
