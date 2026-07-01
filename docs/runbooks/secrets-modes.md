@@ -12,7 +12,7 @@ Regardless of mode, workloads expect these Kubernetes Secrets by name:
 
 - `application-secrets` (`Opaque`)
 - `shared-secrets` (`Opaque`)
-- `plextrac-com-tls` (`kubernetes.io/tls`) when ingress TLS is enabled
+- `internal-tls` (`kubernetes.io/tls`) when ingress TLS is enabled
 - A registry pull secret only if using a private image registry (configured via `global.imagePullSecrets`)
 
 Notes:
@@ -29,13 +29,16 @@ Notes:
 - Chart path: `./charts/plextrac`
 - Set `global.ingress.host` to a valid DNS host for your environment
 
-Base install command:
+Base install command (use the same flags as the [user-guide Phase 4](../user-guide.md#phase-4--install); `--timeout 15m` because the first install runs DB migrations inline):
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
   --namespace plextrac \
-  -f <your-values-file>
+  -f <your-values-file> \
+  --wait --timeout 15m
 ```
+
+> The per-mode install snippets below are abbreviated — use the same `--wait --timeout 15m` flags shown here.
 
 ## Mode 1: `externalSecrets`
 
@@ -57,11 +60,11 @@ Optional generated secret types:
 
 - Registry secret:
   - enable with `secrets.externalSecrets.registryCredentials.enabled=true`
-  - set `targetSecretName` to match the pull secret referenced in `global.imagePullSecrets` (for example `plextrac-registry-creds`)
+  - set `targetSecretName` to match the pull secret referenced in `global.imagePullSecrets` (for example `internal-registry-creds`)
   - set `remoteKey` containing Docker config JSON payload
 - TLS secret:
   - enable with `secrets.externalSecrets.tls.enabled=true`
-  - set `targetSecretName` (default `plextrac-com-tls`)
+  - set `targetSecretName` (default `internal-tls`)
   - set `remoteKey` containing a PKCS#12 bundle (template converts to `tls.crt`/`tls.key`)
 
 Install example:
@@ -91,7 +94,7 @@ Required values:
 Important behavior:
 
 - In CSI mode, this chart renders `SecretProviderClass` only.
-- Workloads still read Kubernetes Secrets by name (`application-secrets`, `shared-secrets`, your image pull secret such as `plextrac-registry-creds`, `plextrac-com-tls`).
+- Workloads still read Kubernetes Secrets by name (`application-secrets`, `shared-secrets`, your image pull secret such as `internal-registry-creds`, `internal-tls`).
 - Configure `secretObjects` so synced Kubernetes Secrets match expected names and key structure.
 
 Install example:
@@ -120,19 +123,19 @@ Reference values file:
 Required setup:
 
 1. Create `application-secrets` and `shared-secrets` with all keys required by GA workloads.
-2. Create the image pull secret (this guide uses `plextrac-registry-creds`; the name must match `global.imagePullSecrets`).
-3. Create TLS secret `plextrac-com-tls` if ingress TLS is used.
+2. Create the image pull secret (this guide uses `internal-registry-creds`; the name must match `global.imagePullSecrets`).
+3. Create TLS secret `internal-tls` if ingress TLS is used.
 
 Example creation commands:
 
 ```bash
 kubectl -n plextrac create secret generic application-secrets --from-env-file=app.env
 kubectl -n plextrac create secret generic shared-secrets --from-env-file=shared.env
-kubectl -n plextrac create secret docker-registry plextrac-registry-creds \
+kubectl -n plextrac create secret docker-registry internal-registry-creds \
   --docker-server=registry.example.com \
   --docker-username="$DOCKER_USER" \
   --docker-password="$DOCKER_PASS"
-kubectl -n plextrac create secret tls plextrac-com-tls \
+kubectl -n plextrac create secret tls internal-tls \
   --cert=./tls.crt \
   --key=./tls.key
 ```

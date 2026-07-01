@@ -18,7 +18,7 @@ title = "PlexTrac Helm Charts"
     '''\{\{[^}]*\}\}''',
     # Kubernetes Secret *resource names* (not secret values)
     '''(application|shared)-secrets''',
-    '''plextrac-com-tls''',
+    '''internal-tls''',
     '''regcred-dorf''',
     # Placeholder marker strings used in example files
     '''(?i)placeholder_''',
