@@ -357,6 +357,21 @@ synqly:
 
 Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Note its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
 
+To run the optional in-cluster Keycloak (OIDC/SSO broker), enable it and set a browser-facing auth hostname (disabled by default):
+
+```yaml
+keycloak:
+  enabled: true
+  host: auth.mycompany.com    # REQUIRED — browser-facing auth hostname (its own DNS + TLS)
+  certManager:
+    issuer: letsencrypt       # or selfSigned / letsencrypt-staging; "" for BYO or a pre-created keycloak-tls
+    email: admin@mycompany.com
+  database:
+    dedicated: false          # reuse the bundled Postgres; set true for a dedicated one
+```
+
+Unlike Synqly, Keycloak is **browser-facing** (SSO login redirects), so it gets its own ingress + `keycloak-tls`. See [Reference: Keycloak](#reference-keycloak-optional).
+
 Preview the rendered output before installing to catch errors early:
 
 ```bash
@@ -875,6 +890,33 @@ synqly:
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
 - **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `plextrac-registry-creds`).
 - **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
+
+---
+
+## Reference: Keycloak (optional)
+
+Keycloak is an optional in-cluster **OIDC/SSO identity broker**, disabled by default and independent of Synqly. When enabled the chart deploys a Keycloak dedicated to this instance and wires PlexTrac's `KEYCLOAK_*` variables to it.
+
+```yaml
+keycloak:
+  enabled: true
+  host: auth.mycompany.com    # REQUIRED — browser-facing auth hostname
+  admin:
+    username: keycloak-admin@plextrac.com
+  certManager:
+    issuer: letsencrypt       # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
+    email: admin@mycompany.com
+  # certManagerClusterIssuer: my-issuer   # BYO issuer (when certManager.issuer is "")
+  database:
+    dedicated: false
+```
+
+- **Browser-facing:** unlike Synqly, Keycloak needs an externally reachable URL for SSO login redirects, so the chart creates its **own ingress** at `keycloak.host` with a `keycloak-tls` secret. `keycloak.host` is required — the chart fails fast without it.
+- **TLS:** three ways to provide `keycloak-tls` — cert-manager (`certManager.issuer`), bring-your-own issuer (`certManagerClusterIssuer`), or a pre-created secret (leave both blank).
+- **Realm/OIDC provisioning is external:** the chart does **not** create realms/clients. It generates `keycloak-oidc-secret` (broker client secret, tenant-realm-admin secret, RSA key); your **realm-provisioning migration Job** consumes it to configure the Keycloak clients, and the PlexTrac app reads the same secret — so all three stay in sync.
+- **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
+- **Secrets:** in `manual` mode the chart generates `keycloak-db-secret`, `keycloak-admin-secret`, and `keycloak-oidc-secret`, preserved across upgrades. In `externalSecrets`/`csi` modes, provide them yourself.
+- **Images:** `images.keycloak` (registry-agnostic, override `.registry` for your mirror); pulls use `keycloak.imagePullSecrets` (default `plextrac-registry-creds`).
 
 ---
 

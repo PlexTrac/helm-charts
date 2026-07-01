@@ -281,6 +281,50 @@
           }
         }
       }
+    },
+    "keycloak": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "admin": {
+          "type": "object",
+          "properties": {
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        },
+        "tlsSecretName": { "type": "string" },
+        "certManager": {
+          "type": "object",
+          "properties": {
+            "issuer": { "type": "string", "enum": ["", "selfSigned", "letsencrypt", "letsencrypt-staging"] },
+            "email": { "type": "string" }
+          }
+        },
+        "certManagerClusterIssuer": { "type": "string" },
+        "resources": { "type": "object" },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" } },
+            "required": ["name"]
+          }
+        },
+        "database": {
+          "type": "object",
+          "properties": {
+            "dedicated": { "type": "boolean" },
+            "name": { "type": "string" },
+            "user": { "type": "string" },
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "storage": { "type": "string" }
+          }
+        }
+      }
     }
   },
   "required": ["global", "secrets", "images"]

@@ -193,6 +193,9 @@ images:
     registry: quay.io
     repository: synqly/embedded
     tag: embedded-2026.06.19
+  keycloak:
+    repository: plextrac/plextrac-keycloak
+    tag: stable
 
 replicaCounts:
   plextracapi: 3
@@ -321,3 +324,40 @@ synqly:
     host: ""                        # defaults to "postgres" (bundled) or "synqly-postgres" (dedicated)
     port: 5432
     storage: 8Gi                    # dedicated Postgres PVC size
+
+# Keycloak — optional, in-cluster OIDC/SSO identity broker (browser-facing via ingress).
+# Realm/OIDC-client provisioning is done by a separate migration Job you run; the chart
+# generates keycloak-oidc-secret (broker client secret, tenant-realm-admin secret, RSA key)
+# for that Job and the app to share. Disabled by default. Independent of synqly.
+keycloak:
+  enabled: false
+  host: ""                          # REQUIRED when enabled: browser-facing auth hostname (e.g. auth.mycompany.com)
+  replicas: 1
+  admin:
+    username: keycloak-admin@plextrac.com   # Keycloak bootstrap admin
+    password: ""                    # generated if empty
+  tlsSecretName: keycloak-tls
+  # TLS for the keycloak ingress. Three ways to provide the keycloak-tls secret:
+  #   cert-manager   -> set certManager.issuer (selfSigned | letsencrypt | letsencrypt-staging) [+ email]
+  #   bring-your-own -> leave certManager.issuer "" and set certManagerClusterIssuer to your Issuer/ClusterIssuer
+  #   pre-created    -> leave both empty and create the keycloak-tls secret yourself
+  certManager:
+    issuer: ""
+    email: ""                       # required for letsencrypt / letsencrypt-staging
+  certManagerClusterIssuer: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  imagePullSecrets:
+    - name: plextrac-registry-creds
+  database:
+    dedicated: false                # false = create a keycloak DB + user in the bundled Postgres; true = dedicated Postgres
+    name: keycloak
+    user: keycloak_admin
+    host: ""                        # defaults to "postgres" (bundled) or "keycloak-postgres" (dedicated)
+    port: 5432
+    storage: 8Gi

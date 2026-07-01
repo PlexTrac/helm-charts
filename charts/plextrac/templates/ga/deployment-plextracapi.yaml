@@ -206,6 +206,23 @@ spec:
               name: synqly-admin
               key: password
         {{- end }}
+        {{- if .Values.keycloak.enabled }}
+        - name: KEYCLOAK_OIDC_BROKER_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: brokerClientSecret
+        - name: KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: tenantRealmAdminClientSecret
+        - name: KEYCLOAK_OIDC_BROKER_RSA_PRIVATE_KEY_PEM
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: rsaPrivateKeyPem
+        {{- end }}
         envFrom:
         - configMapRef:
             name: env-config
