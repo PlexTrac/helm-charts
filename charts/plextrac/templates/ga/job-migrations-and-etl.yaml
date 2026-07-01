@@ -232,6 +232,32 @@ spec:
               name: application-secrets
         - name: RUXPIN_ENABLED
           value: "true"
+        {{- if .Values.keycloak.enabled }}
+        # Keycloak realm-provisioning migration. URLs, CLIENT_DOMAIN_NAME and
+        # PLATFORM_HOSTING_TYPE come from env-config (envFrom below); these are the
+        # secret-backed values it needs. Master admin creds are used only here (not by
+        # the runtime API); the two client secrets are shared with the plextracapi pod.
+        - name: KEYCLOAK_MASTER_REALM_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-admin-secret
+              key: username
+        - name: KEYCLOAK_MASTER_REALM_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-admin-secret
+              key: password
+        - name: KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: tenantRealmAdminClientSecret
+        - name: KEYCLOAK_OIDC_BROKER_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: brokerClientSecret
+        {{- end }}
         envFrom:
         - configMapRef:
             name: env-config

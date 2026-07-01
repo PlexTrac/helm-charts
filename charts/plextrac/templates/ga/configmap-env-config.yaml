@@ -12,6 +12,7 @@ data:
   MAILER_SECURE: "true"
   SYSTEM_LEVEL: PRODUCTION
   DATALAKE_ETL: "false"
+  PLATFORM_HOSTING_TYPE: on-premise
 
   # Ingress / domain
   CLIENT_DOMAIN_NAME: {{ .Values.global.ingress.host | default "" | quote }}
