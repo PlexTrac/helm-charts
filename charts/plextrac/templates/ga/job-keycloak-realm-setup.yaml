@@ -83,6 +83,40 @@ spec:
             secretKeyRef:
               name: keycloak-oidc-secret
               key: brokerClientSecret
+        # The CLI builds the unified-migrate context (createContext), whose config validation
+        # requires these Postgres vars even though the realm-setup path never queries the DB
+        # (pg pools are lazy). PG_HOST comes from env-config. CB_API_USER/PASS are intentionally
+        # omitted so createContext skips the Couchbase connection entirely.
+        - name: PG_CORE_DB
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_CORE_DB
+        - name: PG_CORE_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_CORE_ADMIN_USER
+        - name: PG_CORE_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_CORE_ADMIN_PASSWORD
+        - name: PG_RUNBOOKS_DB
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_RUNBOOKS_DB
+        - name: PG_RUNBOOKS_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_RUNBOOKS_ADMIN_USER
+        - name: PG_RUNBOOKS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: PG_RUNBOOKS_ADMIN_PASSWORD
         resources:
           requests:
             cpu: 100m
