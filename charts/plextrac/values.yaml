@@ -352,8 +352,8 @@ keycloak:
     limits:
       cpu: "1"
       memory: 2Gi
-  imagePullSecrets:
-    - name: plextrac-registry-creds
+  # Pulls use global.imagePullSecrets. To add keycloak-only secrets, set keycloak.imagePullSecrets
+  # (merged with the global list, deduped).
   database:
     dedicated: false                # false = create a keycloak DB + user in the bundled Postgres; true = dedicated Postgres
     name: keycloak

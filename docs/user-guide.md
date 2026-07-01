@@ -912,11 +912,12 @@ keycloak:
 ```
 
 - **Browser-facing:** unlike Synqly, Keycloak needs an externally reachable URL for SSO login redirects, so the chart creates its **own ingress** at `keycloak.host` with a `keycloak-tls` secret. `keycloak.host` is required — the chart fails fast without it.
+- **DNS:** `keycloak.host` must resolve to the **same ingress endpoint as the main app host** (on single-node k3s, the node's IP). The ingress-nginx controller routes to Keycloak by `Host` header — traffic does not pass through the app's `plextracnginx`. If you use cert-manager with an ACME (letsencrypt) issuer, this DNS record must exist and be publicly resolvable *before* install, or the HTTP-01 challenge for `keycloak-tls` will fail.
 - **TLS:** three ways to provide `keycloak-tls` — cert-manager (`certManager.issuer`), bring-your-own issuer (`certManagerClusterIssuer`), or a pre-created secret (leave both blank).
 - **Realm/OIDC provisioning is external:** the chart does **not** create realms/clients. It generates `keycloak-oidc-secret` (broker client secret, tenant-realm-admin secret, RSA key); your **realm-provisioning migration Job** consumes it to configure the Keycloak clients, and the PlexTrac app reads the same secret — so all three stay in sync.
 - **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
 - **Secrets:** in `manual` mode the chart generates `keycloak-db-secret`, `keycloak-admin-secret`, and `keycloak-oidc-secret`, preserved across upgrades. In `externalSecrets`/`csi` modes, provide them yourself.
-- **Images:** `images.keycloak` (registry-agnostic, override `.registry` for your mirror); pulls use `keycloak.imagePullSecrets` (default `plextrac-registry-creds`).
+- **Images:** `images.keycloak` (registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `keycloak.imagePullSecrets` for keycloak-only secrets — the two are merged and deduped).
 
 ---
 
