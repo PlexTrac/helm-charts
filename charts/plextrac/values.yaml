@@ -196,6 +196,12 @@ images:
   keycloak:
     repository: plextrac/plextrac-keycloak
     tag: stable
+  # Image for the one-shot keycloak realm-setup Job (runs `keycloak:onprem:migrate`). Defaults to the
+  # backend image (which already contains the CLI) when left unset. Override only if you publish a
+  # dedicated lean build. Inherits global.image.registry unless registry is set.
+  # keycloakSetup:
+  #   repository: plextrac/plextracapi-keycloak-setup
+  #   tag: stable
 
 replicaCounts:
   plextracapi: 3

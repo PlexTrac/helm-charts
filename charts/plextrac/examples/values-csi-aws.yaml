@@ -74,6 +74,12 @@ images:
     registry: quay.io
     repository: synqly/embedded
     tag: embedded-2026.06.19
+  keycloak:
+    repository: plextrac/plextrac-keycloak
+    tag: stable
+  # keycloakSetup:                            # optional; defaults to the backend image (contains the CLI). Set for a lean build.
+  #   repository: plextrac/plextracapi-keycloak-setup
+  #   tag: stable
 
 replicaCounts:
   plextracapi: 3
@@ -91,3 +97,14 @@ replicaCounts:
 #   enabled: true
 #   database:
 #     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster Keycloak OIDC/SSO broker (disabled by default). Browser-facing: needs its own
+# hostname + TLS, and a custom backend image with the on-prem realm migration. See docs/user-guide.md.
+# keycloak:
+#   enabled: true
+#   host: auth.mycompany.com          # REQUIRED — browser-facing auth hostname
+#   certManager:
+#     issuer: letsencrypt             # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
+#     email: admin@mycompany.com
+#   database:
+#     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one

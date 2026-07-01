@@ -917,7 +917,7 @@ keycloak:
 - **Realm/OIDC provisioning is external:** the chart does **not** create realms/clients. It generates `keycloak-oidc-secret` (broker client secret, tenant-realm-admin secret, RSA key); your **realm-provisioning migration Job** consumes it to configure the Keycloak clients, and the PlexTrac app reads the same secret — so all three stay in sync.
 - **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
 - **Secrets:** in `manual` mode the chart generates `keycloak-db-secret`, `keycloak-admin-secret`, and `keycloak-oidc-secret`, preserved across upgrades. In `externalSecrets`/`csi` modes, provide them yourself.
-- **Images:** `images.keycloak` (registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `keycloak.imagePullSecrets` for keycloak-only secrets — the two are merged and deduped).
+- **Images:** `images.keycloak` (the Keycloak server); the one-shot realm-setup Job uses `images.keycloakSetup` if set, otherwise falls back to `images.backend` (which already contains the CLI) — set `keycloakSetup` only to point at a dedicated lean build. All registry-agnostic (override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `keycloak.imagePullSecrets` for keycloak-only secrets — the two are merged and deduped).
 
 ---
 

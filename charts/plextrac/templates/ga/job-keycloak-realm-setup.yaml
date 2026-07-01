@@ -1,0 +1,93 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Keycloak realm provisioning for on-prem. Runs `keycloak:onprem:migrate`, which calls the
+  # realm-setup logic directly (bypassing the migration framework — 001031 skips on-premise) and
+  # is idempotent, so it is safe to re-run on every rollout.
+  #
+  # Helm: revision-keyed name -> a fresh Job is created on each `helm upgrade` and re-runs; Helm
+  # prunes the prior revision's Job. Under Argo (Release.Revision is 1), the Sync-hook delete
+  # policy provides the re-run instead. (The argo annotations are inert under Helm.)
+  name: keycloak-realm-setup-{{ .Release.Revision }}
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  parallelism: 1
+  # Bounds the whole Job (including the wait-for-keycloak init container) so it cannot hang forever
+  # if Keycloak never becomes ready.
+  activeDeadlineSeconds: 1200
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: disabled
+      labels:
+        {{- include "plextrac.commonLabels" . | nindent 8 }}
+    spec:
+      {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
+      restartPolicy: Never
+      initContainers:
+      # Realm setup talks to Keycloak's admin API, so wait until Keycloak is serving traffic.
+      # Reuses the backend node image (guaranteed to have node) for the HTTP check — no extra
+      # image/registry dependency. KEYCLOAK_INTERNAL_BASE_URL comes from env-config.
+      - name: wait-for-keycloak
+        image: {{ include "plextrac.image" (dict "image" (.Values.images.keycloakSetup | default .Values.images.backend) "root" $) }}
+        imagePullPolicy: Always
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for Keycloak at ${KEYCLOAK_INTERNAL_BASE_URL}/health/ready ..."
+          until node -e "require('http').get(process.env.KEYCLOAK_INTERNAL_BASE_URL+'/health/ready',function(r){process.exit(r.statusCode===200?0:1)}).on('error',function(){process.exit(1)})"; do
+            echo "keycloak not ready yet; retrying in 5s"; sleep 5
+          done
+          echo "keycloak is ready"
+        envFrom:
+        - configMapRef:
+            name: env-config
+      containers:
+      - name: keycloak-realm-setup
+        image: {{ include "plextrac.image" (dict "image" (.Values.images.keycloakSetup | default .Values.images.backend) "root" $) }}
+        imagePullPolicy: Always
+        command: ["npm", "run", "keycloak:onprem:migrate"]
+        # PLATFORM_HOSTING_TYPE, KEYCLOAK_INTERNAL_BASE_URL,
+        # KEYCLOAK_OIDC_BROKER_PLEXTRACAPI_INTERNAL_BASE_URL, KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_ID
+        # and CLIENT_DOMAIN_NAME come from env-config; the secret-backed values are below.
+        envFrom:
+        - configMapRef:
+            name: env-config
+        env:
+        - name: KEYCLOAK_MASTER_REALM_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-admin-secret
+              key: username
+        - name: KEYCLOAK_MASTER_REALM_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-admin-secret
+              key: password
+        - name: KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: tenantRealmAdminClientSecret
+        - name: KEYCLOAK_OIDC_BROKER_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: brokerClientSecret
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+{{- end }}
