@@ -63,3 +63,10 @@ data:
   MCP_SERVER_API_INTERNAL_URL: http://plextracapi:4350
   MCP_SERVER_OTEL_EXPORTER_ENDPOINT: {{ .Values.mcp.otel.exporterEndpoint | default "" | quote }}
 {{- end }}
+{{- with .Values.extraEnv }}
+
+  # Extra env vars (user-provided via .Values.extraEnv)
+  {{- range $key, $value := . }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

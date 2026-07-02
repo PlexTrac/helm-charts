@@ -48,6 +48,10 @@
       },
       "required": ["storageClassName"]
     },
+    "extraEnv": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    },
     "secrets": {
       "type": "object",
       "properties": {

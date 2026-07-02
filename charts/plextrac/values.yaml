@@ -25,6 +25,15 @@ global:
 storage:
   storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
 
+# Extra non-secret environment variables injected into the env-config ConfigMap (consumed by
+# plextracapi and other components via envFrom). Plain key/value pairs; values are always quoted
+# as strings. Do NOT put secrets here — use the secrets.* modes for those.
+# Example:
+#   extraEnv:
+#     SOME_FEATURE_FLAG: "true"
+#     CUSTOM_TIMEOUT_MS: "30000"
+extraEnv: {}
+
 secrets:
   mode: manual
   externalSecrets:
