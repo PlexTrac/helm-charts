@@ -48,6 +48,11 @@ data:
 
   # Synqly (in-cluster)
   SYNQLY_EMBEDDED_URL: http://synqly-embedded:8000
+  # Org identifier the app uses to auth to Synqly (/v1/auth/logon/<org>). Must match the
+  # --organization-name the embedded server was bootstrapped with. plextracapi AND integration-worker
+  # require this (alongside URL/USER/PASSWORD) or they never build the Synqly client -> integrations
+  # report "Integration is not enabled" even though Synqly is reachable.
+  SYNQLY_EMBEDDED_ORGANIZATION: {{ .Values.synqly.organizationID | quote }}
 {{- end }}
 {{- if .Values.keycloak.enabled }}
 
