@@ -386,6 +386,11 @@ keycloak:
 mcp:
   enabled: false
   replicas: 1
+  # Block /mcp/metrics at the ingress. Emits an nginx configuration-snippet annotation, which
+  # REQUIRES the ingress-nginx controller to allow snippet annotations (allow-snippet-annotations:
+  # true) — otherwise the admission webhook rejects the Ingress. Off by default because current
+  # ingress-nginx disables snippets. MCP metrics are scraped in-cluster on port 8000 regardless.
+  blockMetricsPath: false
   # OpenTelemetry is off by default (on-prem has no collector). To enable, set otel.enabled=true
   # and point otel.exporterEndpoint at your OTLP gRPC receiver.
   otel:

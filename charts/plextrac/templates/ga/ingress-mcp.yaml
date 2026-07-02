@@ -21,12 +21,16 @@ metadata:
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, DELETE, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Accept, Authorization, mcp-session-id, mcp-protocol-version"
-    # Rewrite the metrics path to a non-existent backend path so it returns a generic
-    # unknown-route 404 rather than exposing a distinct error page.
+{{- if .Values.mcp.blockMetricsPath }}
+    # Block /mcp/metrics at the edge (mcp.blockMetricsPath=true). This is a snippet annotation, so
+    # the ingress-nginx controller must be configured with allow-snippet-annotations: true, or the
+    # admission webhook will reject this Ingress. MCP metrics are scraped in-cluster on port 8000,
+    # so leaving this off (default) does not affect monitoring.
     nginx.ingress.kubernetes.io/configuration-snippet: |
       if ($uri ~* "^/mcp/metrics/?$") {
         rewrite ^.*$ /_blocked break;
       }
+{{- end }}
 spec:
   ingressClassName: nginx
   rules:
