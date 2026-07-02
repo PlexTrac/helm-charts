@@ -66,7 +66,7 @@ kubectl -n plextrac delete pvc --all
 | `charts/plextrac/` | The PlexTrac Helm chart |
 | `charts/plextrac/values.yaml` | Default values |
 | `charts/plextrac/examples/` | Ready-to-use configuration examples |
-| `.env.example` | Pre-install checklist — copy to `.env.local`, fill in, then run `scripts/setup-registry-credentials.sh` |
+| `.env.example` | Registry credentials — copy to `.env.local`, fill in, then run `scripts/setup-registry-credentials.sh` |
 | `scripts/` | Helper scripts — registry credential setup and other pre-install tasks |
 | `docs/user-guide.md` | Full phased installation and configuration guide |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
