@@ -117,7 +117,7 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
   ```bash
   sudo useradd -m -s /bin/bash plextrac
   sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
-  su - plextrac
+  sudo su plextrac
   ```
   Run every `kubectl` and `helm` command as this user. Only running the K3s installer below uses `sudo`. Because the installer is given `--write-kubeconfig-mode 644`, the kubeconfig is readable and nothing after install (`kubectl`, `helm`, the chart install) needs `sudo`.
 - **Give K3s an explicit node name** instead of letting it use the OS hostname. K3s derives the node name from the hostname, and a long or non-RFC-1123 cloud hostname (e.g. a GCP/AWS instance name) can exceed the 63-character limit and stop the node from registering. Rather than fighting the cloud agent that rewrites the hostname on every boot, pass `--node-name` to the installer — it is baked into the K3s systemd unit and reused on every start, so the node name survives reboots and hostname changes. The install below derives a valid name from the current hostname and pins it **before** K3s first registers the node.
