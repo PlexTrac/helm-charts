@@ -202,6 +202,9 @@ images:
   # keycloakSetup:
   #   repository: plextrac/plextracapi-keycloak-setup
   #   tag: stable
+  mcp:
+    repository: plextrac/mcp
+    tag: stable
 
 replicaCounts:
   plextracapi: 3
@@ -367,3 +370,24 @@ keycloak:
     host: ""                        # defaults to "postgres" (bundled) or "keycloak-postgres" (dedicated)
     port: 5432
     storage: 8Gi
+
+# Optional in-cluster MCP (Model Context Protocol) server, disabled by default.
+# REQUIRES keycloak.enabled (it authenticates via Keycloak). Served as a path (/mcp) on the
+# main app host, not a separate hostname. See docs/user-guide.md.
+mcp:
+  enabled: false
+  replicas: 1
+  # OpenTelemetry is off by default (on-prem has no collector). To enable, set otel.enabled=true
+  # and point otel.exporterEndpoint at your OTLP gRPC receiver.
+  otel:
+    enabled: false
+    exporterEndpoint: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Pulls use global.imagePullSecrets. To add mcp-only secrets, set mcp.imagePullSecrets
+  # (merged with the global list, deduped).

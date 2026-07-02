@@ -112,6 +112,9 @@
 #   keycloakSetup:
 #     repository: registry.mycompany.com/plextrac/plextracapi-keycloak-setup   # custom on-prem realm-setup image
 #     tag: v3.1.10-keycloak.1
+#   mcp:
+#     repository: plextrac/mcp
+#     tag: stable
 
 # Optional in-cluster Synqly integration service (disabled by default).
 # Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
@@ -130,3 +133,10 @@
 #     email: admin@mycompany.com
 #   database:
 #     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
+# REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
+# mcp:
+#   enabled: true
+#   otel:
+#     enabled: false          # set true + exporterEndpoint for your OTLP collector

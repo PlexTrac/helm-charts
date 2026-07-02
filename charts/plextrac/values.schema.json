@@ -325,6 +325,29 @@
           }
         }
       }
+    },
+    "mcp": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "otel": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "exporterEndpoint": { "type": "string" }
+          }
+        },
+        "resources": { "type": "object" },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" } },
+            "required": ["name"]
+          }
+        }
+      }
     }
   },
   "required": ["global", "secrets", "images"]

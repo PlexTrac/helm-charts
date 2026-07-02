@@ -57,3 +57,9 @@ data:
   KEYCLOAK_OIDC_BROKER_PLEXTRACAPI_INTERNAL_BASE_URL: http://plextracapi:4350
   KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_ID: plextrac-tenant-realm-admin-service-account
 {{- end }}
+{{- if .Values.mcp.enabled }}
+
+  # MCP (in-cluster Model Context Protocol server)
+  MCP_SERVER_API_INTERNAL_URL: http://plextracapi:4350
+  MCP_SERVER_OTEL_EXPORTER_ENDPOINT: {{ .Values.mcp.otel.exporterEndpoint | default "" | quote }}
+{{- end }}

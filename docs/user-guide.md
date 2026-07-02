@@ -18,8 +18,9 @@
 12. [Reference: Overriding values](#reference-overriding-values)
 13. [Reference: Synqly (optional)](#reference-synqly-optional)
 14. [Reference: Keycloak (optional)](#reference-keycloak-optional)
-15. [Upgrading](#upgrading)
-16. [Troubleshooting](#troubleshooting)
+15. [Reference: MCP (optional)](#reference-mcp-optional)
+16. [Upgrading](#upgrading)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -960,6 +961,29 @@ keycloak:
 - **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
 - **Secrets:** in `manual` mode the chart generates `keycloak-db-secret`, `keycloak-admin-secret`, and `keycloak-oidc-secret`, preserved across upgrades. In `externalSecrets`/`csi` modes, provide them yourself.
 - **Images:** `images.keycloak` (the Keycloak server); the one-shot realm-setup Job uses `images.keycloakSetup` if set, otherwise falls back to `images.backend` (which already contains the CLI) — set `keycloakSetup` only to point at a dedicated lean build. All registry-agnostic (override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `keycloak.imagePullSecrets` for keycloak-only secrets — the two are merged and deduped).
+
+---
+
+## Reference: MCP (optional)
+
+MCP is an optional in-cluster **Model Context Protocol server**, disabled by default. It **requires Keycloak** — it authenticates via Keycloak and reuses the tenant-realm-admin client credential — so the chart fails fast if `mcp.enabled: true` while `keycloak.enabled: false`.
+
+```yaml
+mcp:
+  enabled: true
+otel:
+  enabled: false             # on-prem default; set true + exporterEndpoint for an OTLP collector
+keycloak:
+  enabled: true              # required
+  host: auth.mycompany.com
+```
+
+- **Requires Keycloak:** MCP consumes `keycloak-oidc-secret` (the `tenantRealmAdminClientSecret`) and the `KEYCLOAK_*_BASE_URL` values, so `keycloak.enabled` must be `true`. The chart fails fast otherwise.
+- **Routing:** unlike Keycloak, MCP is **not** a separate hostname — it's served at the path **`/mcp`** on your main app host (`global.ingress.host`) and shares that host's TLS certificate (provided by the app's ingress). No extra DNS record or cert is needed.
+- **Networking:** ClusterIP `mcp` on port 8000; the ingress adds CORS and long-lived-connection timeouts for MCP clients, and blocks the `/mcp/metrics` path from the public route.
+- **OpenTelemetry:** off by default (an on-prem cluster has no collector). To enable tracing, set `mcp.otel.enabled: true` and `mcp.otel.exporterEndpoint` to your OTLP gRPC receiver.
+- **Secrets:** reuses existing chart secrets — `JWT_KEY` (`application-secrets`), `LAUNCH_DARKLY_SDK_KEY` (`shared-secrets`), and the Keycloak client secret (`keycloak-oidc-secret`). Nothing new to provide.
+- **Images:** `images.mcp` (registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `mcp.imagePullSecrets` for mcp-only secrets — the two are merged and deduped).
 
 ---
 

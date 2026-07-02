@@ -67,6 +67,20 @@ imagePullSecrets:
 {{- end }}
 {{- end -}}
 
+{{/* MCP pull secrets: union of global.imagePullSecrets and mcp.imagePullSecrets (deduped by name). */}}
+{{- define "plextrac.mcp.imagePullSecrets" -}}
+{{- $names := list -}}
+{{- range concat (.Values.global.imagePullSecrets | default list) (.Values.mcp.imagePullSecrets | default list) -}}
+{{- $names = append $names .name -}}
+{{- end -}}
+{{- with ($names | uniq) }}
+imagePullSecrets:
+{{- range . }}
+- name: {{ . }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
 {{- define "plextrac.manualSecretDefaultValue" -}}
 {{- $key := .key -}}
 {{- if eq $key "ADMIN_EMAIL" -}}

@@ -85,6 +85,9 @@ images:
   # keycloakSetup:                            # optional; defaults to the backend image (contains the CLI). Set for a lean build.
   #   repository: plextrac/plextracapi-keycloak-setup
   #   tag: stable
+  mcp:
+    repository: plextrac/mcp
+    tag: stable
 
 replicaCounts:
   plextracapi: 3
@@ -113,3 +116,10 @@ replicaCounts:
 #     email: admin@mycompany.com
 #   database:
 #     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
+# REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
+# mcp:
+#   enabled: true
+#   otel:
+#     enabled: false          # set true + exporterEndpoint for your OTLP collector

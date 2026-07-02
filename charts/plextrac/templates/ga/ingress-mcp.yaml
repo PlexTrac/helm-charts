@@ -1,0 +1,43 @@
+{{- if .Values.mcp.enabled }}
+# MCP is served as a path (/mcp) on the main app host — it shares that host's TLS
+# (provided by the plextracnginx ingress), so no separate hostname/cert is needed.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-ingress
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Accept, Authorization, mcp-session-id, mcp-protocol-version"
+    # Rewrite the metrics path to a non-existent backend path so it returns a generic
+    # unknown-route 404 rather than exposing a distinct error page.
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($uri ~* "^/mcp/metrics/?$") {
+        rewrite ^.*$ /_blocked break;
+      }
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ include "plextrac.ingressHost" . }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: mcp
+            port:
+              number: 8000
+        path: /mcp(/|$)(.*)
+        pathType: ImplementationSpecific
+{{- end }}
