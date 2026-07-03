@@ -50,6 +50,19 @@ Read through this checklist before touching any `helm` command. Installing the c
 
 > `datalake-maintainer` ships **disabled** (0 replicas) by default — seeing it with no pods is expected and does not block startup. `migrations-and-etl` runs as a normal Job during install (its name includes the release revision, e.g. `migrations-and-etl-1`) and migrates the database before the API reports healthy. `bootstrap-minio` is a Helm **post-install/post-upgrade hook**, so it appears only *after* the main workloads are running. See [Phase 4](#phase-4--install).
 
+**Optional components** — all **disabled by default**; deployed only when you enable them in your values file (1 replica each unless noted):
+
+| Workload | Kind | Enabled by |
+|---|---|---|
+| synqly-embedded | Deployment | `synqly.enabled` |
+| synqly-postgres | Deployment | `synqly.enabled` **and** `synqly.database.dedicated` |
+| keycloak | Deployment | `keycloak.enabled` |
+| keycloak-postgres | Deployment | `keycloak.enabled` **and** `keycloak.database.dedicated` |
+| keycloak-realm-setup | Job | `keycloak.enabled` |
+| mcp | Deployment | `mcp.enabled` (requires `keycloak.enabled`) |
+
+> The dedicated-Postgres deployments (`synqly-postgres`, `keycloak-postgres`) appear only when you set the respective `database.dedicated: true`; otherwise those components share the bundled `postgres`. `keycloak-realm-setup` is a revision-keyed Job that re-runs (idempotently) on every upgrade to provision the Keycloak realm. The resource estimate below covers the core stack only — enabling these adds to it. See the reference sections for [Synqly](#reference-synqly-optional), [Keycloak](#reference-keycloak-optional), and [MCP](#reference-mcp-optional).
+
 **Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
 
 ### Software requirements
