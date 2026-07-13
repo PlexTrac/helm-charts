@@ -1,0 +1,38 @@
+{{- /*
+Optional cert-manager Issuer for the keycloak ingress cert (namespaced), rendered only when
+keycloak.certManager.issuer is a built-in value. Leave it "" to bring your own issuer
+(keycloak.certManagerClusterIssuer) or a pre-created keycloak-tls secret. Requires cert-manager.
+*/ -}}
+{{- if .Values.keycloak.enabled -}}
+{{- $cm := .Values.keycloak.certManager | default dict -}}
+{{- $issuer := $cm.issuer | default "" -}}
+{{- if $issuer -}}
+{{- if not (has $issuer (list "selfSigned" "letsencrypt" "letsencrypt-staging")) -}}
+{{- fail "keycloak.certManager.issuer must be one of: selfSigned, letsencrypt, letsencrypt-staging (or \"\" for BYO / pre-created keycloak-tls)" -}}
+{{- end -}}
+{{- if and (ne $issuer "selfSigned") (not $cm.email) -}}
+{{- fail "keycloak.certManager.email is required when keycloak.certManager.issuer is letsencrypt or letsencrypt-staging" -}}
+{{- end -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: keycloak-issuer
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+{{- if eq $issuer "selfSigned" }}
+  selfSigned: {}
+{{- else }}
+  acme:
+    server: {{ if eq $issuer "letsencrypt-staging" }}https://acme-staging-v02.api.letsencrypt.org/directory{{ else }}https://acme-v02.api.letsencrypt.org/directory{{ end }}
+    email: {{ $cm.email | quote }}
+    privateKeySecretRef:
+      name: keycloak-acme-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+{{- end }}
+{{- end -}}
+{{- end }}

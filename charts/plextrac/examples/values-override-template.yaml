@@ -106,6 +106,15 @@
 #     registry: registry.mycompany.com   # your quay proxy/mirror (Synqly's image is on quay.io)
 #     repository: synqly/embedded
 #     tag: embedded-2026.06.19
+#   keycloak:
+#     repository: plextrac/plextrac-keycloak
+#     tag: stable
+#   keycloakSetup:
+#     repository: registry.mycompany.com/plextrac/plextracapi-keycloak-setup   # custom on-prem realm-setup image
+#     tag: v3.1.10-keycloak.1
+#   mcp:
+#     repository: plextrac/mcp
+#     tag: stable
 
 # Optional in-cluster Synqly integration service (disabled by default).
 # Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
@@ -113,3 +122,26 @@
 #   enabled: true
 #   database:
 #     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster Keycloak OIDC/SSO broker (disabled by default). Browser-facing: needs its own
+# hostname + TLS, and a custom backend image with the on-prem realm migration. See docs/user-guide.md.
+# keycloak:
+#   enabled: true
+#   host: auth.mycompany.com          # REQUIRED — browser-facing auth hostname
+#   certManager:
+#     issuer: letsencrypt             # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
+#     email: admin@mycompany.com
+#   database:
+#     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
+# REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
+# mcp:
+#   enabled: true
+#   otel:
+#     enabled: false          # set true + exporterEndpoint for your OTLP collector
+
+# Extra non-secret env vars injected into the env-config ConfigMap (see the chart's values.yaml).
+# extraEnv:
+#   SOME_FEATURE_FLAG: "true"
+#   CUSTOM_TIMEOUT_MS: "30000"

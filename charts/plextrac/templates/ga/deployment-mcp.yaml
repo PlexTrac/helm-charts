@@ -1,0 +1,127 @@
+{{- if .Values.mcp.enabled }}
+{{- if not .Values.keycloak.enabled }}
+{{- fail "mcp.enabled=true requires keycloak.enabled=true (MCP authenticates via Keycloak and consumes keycloak-oidc-secret)" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    app.kubernetes.io/component: ai
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mcp.replicas | default 1 }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: mcp
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        linkerd.io/inject: enabled
+      labels:
+        app: mcp
+        app.kubernetes.io/component: ai
+        {{- include "plextrac.commonLabels" . | nindent 8 }}
+    spec:
+      {{- include "plextrac.mcp.imagePullSecrets" . | nindent 6 }}
+      securityContext:
+        runAsUser: 1337
+        runAsGroup: 1337
+        fsGroup: 1337
+      containers:
+      - name: mcp
+        image: {{ include "plextrac.image" (dict "image" .Values.images.mcp "root" $) }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: mcp-port
+        env:
+        - name: API_AUTH
+          value: "keycloak"
+        - name: API_INTERNAL_URL
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: MCP_SERVER_API_INTERNAL_URL
+        - name: APP_ENV
+          value: "prod"
+        - name: CLIENT_DOMAIN_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: CLIENT_DOMAIN_NAME
+        - name: HOST
+          value: "0.0.0.0"
+        - name: JWT_KEY
+          valueFrom:
+            secretKeyRef:
+              name: application-secrets
+              key: JWT_KEY
+        - name: KEYCLOAK_EXTERNAL_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: KEYCLOAK_EXTERNAL_BASE_URL
+        - name: KEYCLOAK_INTERNAL_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: KEYCLOAK_INTERNAL_BASE_URL
+        - name: KEYCLOAK_OIDC_BROKER_CLIENT_ID
+          value: "plextrac-tenant-realm-admin-service-account"
+        - name: KEYCLOAK_OIDC_BROKER_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-oidc-secret
+              key: tenantRealmAdminClientSecret
+        - name: LAUNCH_DARKLY_SDK_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shared-secrets
+              key: LAUNCH_DARKLY_SDK_KEY
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: OTEL_ENABLED
+          value: {{ .Values.mcp.otel.enabled | default false | quote }}
+        - name: OTEL_EXPORTER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: MCP_SERVER_OTEL_EXPORTER_ENDPOINT
+        - name: PORT
+          value: "8000"
+        - name: RATE_LIMIT_ENABLED
+          value: "true"
+        - name: SERVER_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: CLIENT_DOMAIN_NAME
+        - name: TRANSPORT
+          value: "http"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 5
+        resources:
+          {{- toYaml .Values.mcp.resources | nindent 10 }}
+      restartPolicy: Always
+{{- end }}

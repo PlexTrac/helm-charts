@@ -1,0 +1,19 @@
+{{- if .Values.mcp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp
+  namespace: {{ include "plextrac.namespace" . }}
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    serviceName: mcp
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  ports:
+  - name: mcp-port
+    port: 8000
+    targetPort: mcp-port
+  selector:
+    app: mcp
+{{- end }}

@@ -12,6 +12,7 @@ data:
   MAILER_SECURE: "true"
   SYSTEM_LEVEL: PRODUCTION
   DATALAKE_ETL: "false"
+  PLATFORM_HOSTING_TYPE: on-premise
 
   # Ingress / domain
   CLIENT_DOMAIN_NAME: {{ .Values.global.ingress.host | default "" | quote }}
@@ -47,4 +48,30 @@ data:
 
   # Synqly (in-cluster)
   SYNQLY_EMBEDDED_URL: http://synqly-embedded:8000
+  # Org identifier the app uses to auth to Synqly (/v1/auth/logon/<org>). Must match the
+  # --organization-name the embedded server was bootstrapped with. plextracapi AND integration-worker
+  # require this (alongside URL/USER/PASSWORD) or they never build the Synqly client -> integrations
+  # report "Integration is not enabled" even though Synqly is reachable.
+  SYNQLY_EMBEDDED_ORGANIZATION: {{ .Values.synqly.organizationID | quote }}
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+
+  # Keycloak (in-cluster OIDC broker)
+  KEYCLOAK_INTERNAL_BASE_URL: http://keycloak-internal:80
+  KEYCLOAK_EXTERNAL_BASE_URL: {{ printf "https://%s" .Values.keycloak.host | quote }}
+  KEYCLOAK_OIDC_BROKER_PLEXTRACAPI_INTERNAL_BASE_URL: http://plextracapi:4350
+  KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_ID: plextrac-tenant-realm-admin-service-account
+{{- end }}
+{{- if .Values.mcp.enabled }}
+
+  # MCP (in-cluster Model Context Protocol server)
+  MCP_SERVER_API_INTERNAL_URL: http://plextracapi:4350
+  MCP_SERVER_OTEL_EXPORTER_ENDPOINT: {{ .Values.mcp.otel.exporterEndpoint | default "" | quote }}
+{{- end }}
+{{- with .Values.extraEnv }}
+
+  # Extra env vars (user-provided via .Values.extraEnv)
+  {{- range $key, $value := . }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
 {{- end }}

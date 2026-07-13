@@ -25,6 +25,15 @@ global:
 storage:
   storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
 
+# Extra non-secret environment variables injected into the env-config ConfigMap (consumed by
+# plextracapi and other components via envFrom). Plain key/value pairs; values are always quoted
+# as strings. Do NOT put secrets here — use the secrets.* modes for those.
+# Example:
+#   extraEnv:
+#     SOME_FEATURE_FLAG: "true"
+#     CUSTOM_TIMEOUT_MS: "30000"
+extraEnv: {}
+
 secrets:
   mode: manual
   externalSecrets:
@@ -193,6 +202,18 @@ images:
     registry: quay.io
     repository: synqly/embedded
     tag: embedded-2026.06.19
+  keycloak:
+    repository: plextrac/plextrac-keycloak
+    tag: stable
+  # Image for the one-shot keycloak realm-setup Job (runs `keycloak:onprem:migrate`). Defaults to the
+  # backend image (which already contains the CLI) when left unset. Override only if you publish a
+  # dedicated lean build. Inherits global.image.registry unless registry is set.
+  # keycloakSetup:
+  #   repository: plextrac/plextracapi-keycloak-setup
+  #   tag: stable
+  mcp:
+    repository: plextrac/mcp
+    tag: stable
 
 replicaCounts:
   plextracapi: 3
@@ -321,3 +342,66 @@ synqly:
     host: ""                        # defaults to "postgres" (bundled) or "synqly-postgres" (dedicated)
     port: 5432
     storage: 8Gi                    # dedicated Postgres PVC size
+
+# Keycloak — optional, in-cluster OIDC/SSO identity broker (browser-facing via ingress).
+# Realm/OIDC-client provisioning is done by a separate migration Job you run; the chart
+# generates keycloak-oidc-secret (broker client secret, tenant-realm-admin secret, RSA key)
+# for that Job and the app to share. Disabled by default. Independent of synqly.
+keycloak:
+  enabled: false
+  host: ""                          # REQUIRED when enabled: browser-facing auth hostname (e.g. auth.mycompany.com)
+  replicas: 1
+  admin:
+    username: admin@mycompany.com   # Keycloak bootstrap admin
+    password: ""                    # generated if empty
+  tlsSecretName: keycloak-tls
+  # TLS for the keycloak ingress. Three ways to provide the keycloak-tls secret:
+  #   cert-manager   -> set certManager.issuer (selfSigned | letsencrypt | letsencrypt-staging) [+ email]
+  #   bring-your-own -> leave certManager.issuer "" and set certManagerClusterIssuer to your Issuer/ClusterIssuer
+  #   pre-created    -> leave both empty and create the keycloak-tls secret yourself
+  certManager:
+    issuer: ""
+    email: ""                       # required for letsencrypt / letsencrypt-staging
+  certManagerClusterIssuer: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  # Pulls use global.imagePullSecrets. To add keycloak-only secrets, set keycloak.imagePullSecrets
+  # (merged with the global list, deduped).
+  database:
+    dedicated: false                # false = create a keycloak DB + user in the bundled Postgres; true = dedicated Postgres
+    name: keycloak
+    user: keycloak_admin
+    host: ""                        # defaults to "postgres" (bundled) or "keycloak-postgres" (dedicated)
+    port: 5432
+    storage: 8Gi
+
+# Optional in-cluster MCP (Model Context Protocol) server, disabled by default.
+# REQUIRES keycloak.enabled (it authenticates via Keycloak). Served as a path (/mcp) on the
+# main app host, not a separate hostname. See docs/user-guide.md.
+mcp:
+  enabled: false
+  replicas: 1
+  # Block /mcp/metrics at the ingress. Emits an nginx configuration-snippet annotation, which
+  # REQUIRES the ingress-nginx controller to allow snippet annotations (allow-snippet-annotations:
+  # true) — otherwise the admission webhook rejects the Ingress. Off by default because current
+  # ingress-nginx disables snippets. MCP metrics are scraped in-cluster on port 8000 regardless.
+  blockMetricsPath: false
+  # OpenTelemetry is off by default (on-prem has no collector). To enable, set otel.enabled=true
+  # and point otel.exporterEndpoint at your OTLP gRPC receiver.
+  otel:
+    enabled: false
+    exporterEndpoint: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Pulls use global.imagePullSecrets. To add mcp-only secrets, set mcp.imagePullSecrets
+  # (merged with the global list, deduped).

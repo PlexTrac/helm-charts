@@ -17,8 +17,10 @@
 11. [Reference: Replica counts](#reference-replica-counts)
 12. [Reference: Overriding values](#reference-overriding-values)
 13. [Reference: Synqly (optional)](#reference-synqly-optional)
-14. [Upgrading](#upgrading)
-15. [Troubleshooting](#troubleshooting)
+14. [Reference: Keycloak (optional)](#reference-keycloak-optional)
+15. [Reference: MCP (optional)](#reference-mcp-optional)
+16. [Upgrading](#upgrading)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -47,6 +49,19 @@ Read through this checklist before touching any `helm` command. Installing the c
 | bootstrap-minio | Job (post-install hook) | — |
 
 > `datalake-maintainer` ships **disabled** (0 replicas) by default — seeing it with no pods is expected and does not block startup. `migrations-and-etl` runs as a normal Job during install (its name includes the release revision, e.g. `migrations-and-etl-1`) and migrates the database before the API reports healthy. `bootstrap-minio` is a Helm **post-install/post-upgrade hook**, so it appears only *after* the main workloads are running. See [Phase 4](#phase-4--install).
+
+**Optional components** — all **disabled by default**; deployed only when you enable them in your values file (1 replica each unless noted):
+
+| Workload | Kind | Enabled by |
+|---|---|---|
+| synqly-embedded | Deployment | `synqly.enabled` |
+| synqly-postgres | Deployment | `synqly.enabled` **and** `synqly.database.dedicated` |
+| keycloak | Deployment | `keycloak.enabled` |
+| keycloak-postgres | Deployment | `keycloak.enabled` **and** `keycloak.database.dedicated` |
+| keycloak-realm-setup | Job | `keycloak.enabled` |
+| mcp | Deployment | `mcp.enabled` (requires `keycloak.enabled`) |
+
+> The dedicated-Postgres deployments (`synqly-postgres`, `keycloak-postgres`) appear only when you set the respective `database.dedicated: true`; otherwise those components share the bundled `postgres`. `keycloak-realm-setup` is a revision-keyed Job that re-runs (idempotently) on every upgrade to provision the Keycloak realm. The resource estimate below covers the core stack only — enabling these adds to it. See the reference sections for [Synqly](#reference-synqly-optional), [Keycloak](#reference-keycloak-optional), and [MCP](#reference-mcp-optional).
 
 **Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
 
@@ -115,7 +130,7 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
   ```bash
   sudo useradd -m -s /bin/bash plextrac
   sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
-  su - plextrac
+  sudo su plextrac
   ```
   Run every `kubectl` and `helm` command as this user. Only running the K3s installer below uses `sudo`. Because the installer is given `--write-kubeconfig-mode 644`, the kubeconfig is readable and nothing after install (`kubectl`, `helm`, the chart install) needs `sudo`.
 - **Give K3s an explicit node name** instead of letting it use the OS hostname. K3s derives the node name from the hostname, and a long or non-RFC-1123 cloud hostname (e.g. a GCP/AWS instance name) can exceed the 63-character limit and stop the node from registering. Rather than fighting the cloud agent that rewrites the hostname on every boot, pass `--node-name` to the installer — it is baked into the K3s systemd unit and reused on every start, so the node name survives reboots and hostname changes. The install below derives a valid name from the current hostname and pins it **before** K3s first registers the node.
@@ -209,14 +224,14 @@ For local/lab installs without DNS, add an entry to `/etc/hosts` on any machine 
 
 **Do not run `helm install` until you have completed this phase.**
 
-Copy `.env.example` from the repo root and fill it in:
+Copy `.env.example` from the repo root and fill in your registry credentials:
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local with your domain, credentials, and any optional integration keys
+# Edit .env.local — set your DOCKER_* (and CKEDITOR_DOCKER_*, if using CKEditor) credentials
 ```
 
-`.env.local` is **not** read by Helm. Only `scripts/setup-registry-credentials.sh` reads it, and only the `DOCKER_*` / `CKEDITOR_DOCKER_*` variables. Every other variable — your domain, TLS, storage class, admin email, integrations — is a reference checklist that you copy into `my-values.yaml` yourself in [Phase 3](#phase-3--configure-your-values-file); each variable includes a comment showing the exact `my-values.yaml` field it maps to. Setting `PLEXTRAC_DOMAIN` in `.env.local`, for example, does **not** configure the chart — you must also set `global.ingress.host` in `my-values.yaml`.
+`.env.local` is **not** read by Helm. It holds only your image-registry credentials, consumed solely by `scripts/setup-registry-credentials.sh` (Step 2.2). Everything else about the deployment — domain, TLS, storage class, secrets, optional integrations — is configured directly in your values file in [Phase 3](#phase-3--configure-your-values-file), using one of the `charts/plextrac/examples/values-*.yaml` files as your starting point.
 
 ### 2.1 — Required: domain
 
@@ -294,7 +309,7 @@ To use an issuer you manage yourself instead (DNS-01, a private CA, Vault, etc.)
 
 ## Phase 3 — Configure your values file
 
-With your `.env.local` filled in, use it as a reference while editing your values file. Each variable in `.env.local` has a comment of the form `→ some.values.yaml.path` — those are the fields to set here.
+Copy the example values file closest to your setup and edit it — this is where the domain, TLS, storage class, secrets, and any optional integrations are configured (the registry credentials from Phase 2 are handled by the setup script and don't go here).
 
 ```bash
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
@@ -367,6 +382,21 @@ synqly:
 ```
 
 `admin.username` is **required** when `synqly.enabled: true` and must be an email address. In the default `manual` secrets mode the chart fails fast — even at `helm template` — if it is missing or not an email, so the preview/install below will abort until you set it. Synqly runs internal-only (no ingress) and PlexTrac is wired to it automatically. Its key storage is non-production by default — see [Reference: Synqly](#reference-synqly-optional).
+
+To run the optional in-cluster Keycloak (OIDC/SSO broker), enable it and set a browser-facing auth hostname (disabled by default):
+
+```yaml
+keycloak:
+  enabled: true
+  host: auth.mycompany.com    # REQUIRED — browser-facing auth hostname (its own DNS + TLS)
+  certManager:
+    issuer: letsencrypt       # or selfSigned / letsencrypt-staging; "" for BYO or a pre-created keycloak-tls
+    email: admin@mycompany.com
+  database:
+    dedicated: false          # reuse the bundled Postgres; set true for a dedicated one
+```
+
+Unlike Synqly, Keycloak is **browser-facing** (SSO login redirects), so it gets its own ingress + `keycloak-tls`. See [Reference: Keycloak](#reference-keycloak-optional).
 
 Preview the rendered output before installing to catch errors early:
 
@@ -547,7 +577,7 @@ secrets:
 
 See `charts/plextrac/examples/values-external-secrets.yaml` for a complete example.
 
-> **Required keys:** in ESO mode the chart does **not** generate secrets — your secret store must already contain the full `application-secrets` key set (all keys) **and** the `shared-secrets` keys before install, or pods crash-loop on startup. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` and Section C of `.env.example`.
+> **Required keys:** in ESO mode the chart does **not** generate secrets — your secret store must already contain the full `application-secrets` key set (all keys) **and** the `shared-secrets` keys before install, or pods crash-loop on startup. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` (see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
 
 ### CSI Secrets Store mode
 
@@ -575,7 +605,7 @@ secrets:
 
 See `charts/plextrac/examples/values-csi-aws.yaml` and `values-csi-gcp.yaml` for provider-specific examples.
 
-> **Required keys:** like ESO mode, CSI mode does **not** generate secrets — your provider store must contain the full `application-secrets` and `shared-secrets` key sets before install. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` and Section C of `.env.example`.
+> **Required keys:** like ESO mode, CSI mode does **not** generate secrets — your provider store must contain the full `application-secrets` and `shared-secrets` key sets before install. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` (see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
 
 For full details on all three modes, see [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
 
@@ -684,7 +714,7 @@ secrets:
 
 ### Option E — TLS via External Secrets (ESO)
 
-In `externalSecrets` mode, enable `secrets.externalSecrets.tls` and point its `remoteKey` at the certificate in your store. The remote value **must be a PKCS#12 bundle** — the chart converts it to `tls.crt`/`tls.key`. A PEM payload yields a broken/empty TLS secret. See [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md) and `.env.example`.
+In `externalSecrets` mode, enable `secrets.externalSecrets.tls` and point its `remoteKey` at the certificate in your store. The remote value **must be a PKCS#12 bundle** — the chart converts it to `tls.crt`/`tls.key`. A PEM payload yields a broken/empty TLS secret. See [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
 
 ### Option D — No managed certificate (dev/testing only)
 
@@ -916,6 +946,57 @@ synqly:
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
 - **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `internal-registry-creds`).
 - **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
+
+---
+
+## Reference: Keycloak (optional)
+
+Keycloak is an optional in-cluster **OIDC/SSO identity broker**, disabled by default and independent of Synqly. When enabled the chart deploys a Keycloak dedicated to this instance and wires PlexTrac's `KEYCLOAK_*` variables to it.
+
+```yaml
+keycloak:
+  enabled: true
+  host: auth.mycompany.com    # REQUIRED — browser-facing auth hostname
+  admin:
+    username: admin@mycompany.com
+  certManager:
+    issuer: letsencrypt       # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
+    email: admin@mycompany.com
+  # certManagerClusterIssuer: my-issuer   # BYO issuer (when certManager.issuer is "")
+  database:
+    dedicated: false
+```
+
+- **Browser-facing:** unlike Synqly, Keycloak needs an externally reachable URL for SSO login redirects, so the chart creates its **own ingress** at `keycloak.host` with a `keycloak-tls` secret. `keycloak.host` is required — the chart fails fast without it.
+- **DNS:** `keycloak.host` must resolve to the **same ingress endpoint as the main app host** (on single-node k3s, the node's IP). The ingress-nginx controller routes to Keycloak by `Host` header — traffic does not pass through the app's `plextracnginx`. If you use cert-manager with an ACME (letsencrypt) issuer, this DNS record must exist and be publicly resolvable *before* install, or the HTTP-01 challenge for `keycloak-tls` will fail.
+- **TLS:** three ways to provide `keycloak-tls` — cert-manager (`certManager.issuer`), bring-your-own issuer (`certManagerClusterIssuer`), or a pre-created secret (leave both blank).
+- **Realm/OIDC provisioning is external:** the chart does **not** create realms/clients. It generates `keycloak-oidc-secret` (broker client secret, tenant-realm-admin secret, RSA key); your **realm-provisioning migration Job** consumes it to configure the Keycloak clients, and the PlexTrac app reads the same secret — so all three stay in sync.
+- **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
+- **Secrets:** in `manual` mode the chart generates `keycloak-db-secret`, `keycloak-admin-secret`, and `keycloak-oidc-secret`, preserved across upgrades. In `externalSecrets`/`csi` modes, provide them yourself.
+- **Images:** `images.keycloak` (the Keycloak server); the one-shot realm-setup Job uses `images.keycloakSetup` if set, otherwise falls back to `images.backend` (which already contains the CLI) — set `keycloakSetup` only to point at a dedicated lean build. All registry-agnostic (override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `keycloak.imagePullSecrets` for keycloak-only secrets — the two are merged and deduped).
+
+---
+
+## Reference: MCP (optional)
+
+MCP is an optional in-cluster **Model Context Protocol server**, disabled by default. It **requires Keycloak** — it authenticates via Keycloak and reuses the tenant-realm-admin client credential — so the chart fails fast if `mcp.enabled: true` while `keycloak.enabled: false`.
+
+```yaml
+mcp:
+  enabled: true
+otel:
+  enabled: false             # on-prem default; set true + exporterEndpoint for an OTLP collector
+keycloak:
+  enabled: true              # required
+  host: auth.mycompany.com
+```
+
+- **Requires Keycloak:** MCP consumes `keycloak-oidc-secret` (the `tenantRealmAdminClientSecret`) and the `KEYCLOAK_*_BASE_URL` values, so `keycloak.enabled` must be `true`. The chart fails fast otherwise.
+- **Routing:** unlike Keycloak, MCP is **not** a separate hostname — it's served at the path **`/mcp`** on your main app host (`global.ingress.host`) and shares that host's TLS certificate (provided by the app's ingress). No extra DNS record or cert is needed.
+- **Networking:** ClusterIP `mcp` on port 8000; the ingress adds CORS and long-lived-connection timeouts for MCP clients, and blocks the `/mcp/metrics` path from the public route.
+- **OpenTelemetry:** off by default (an on-prem cluster has no collector). To enable tracing, set `mcp.otel.enabled: true` and `mcp.otel.exporterEndpoint` to your OTLP gRPC receiver.
+- **Secrets:** reuses existing chart secrets — `JWT_KEY` (`application-secrets`), `LAUNCH_DARKLY_SDK_KEY` (`shared-secrets`), and the Keycloak client secret (`keycloak-oidc-secret`). Nothing new to provide.
+- **Images:** `images.mcp` (registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `mcp.imagePullSecrets` for mcp-only secrets — the two are merged and deduped).
 
 ---
 
