@@ -49,6 +49,9 @@ images:
   redisExporter:
     repository: oliver006/redis_exporter
     tag: latest
+  postgresExporter:
+    repository: prometheuscommunity/postgres-exporter
+    tag: latest
   minioBootstrap:
     repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextrac-minio-bootstrap
     tag: stable

@@ -68,6 +68,9 @@ images:
   redisExporter:
     repository: oliver006/redis_exporter
     tag: latest
+  postgresExporter:
+    repository: prometheuscommunity/postgres-exporter
+    tag: latest
   minio:
     repository: plextrac/minio
     tag: latest
