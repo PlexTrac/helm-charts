@@ -102,7 +102,7 @@ secrets:
         - PG_CORE_RO_USER
         - PG_CORE_RW_PASSWORD
         - PG_CORE_RW_USER
-        # PG_METRICS_* back the postgres-exporter sidecar and are created by initdb.sh.
+        # PG_METRICS_* are used by initdb.sh to create the postgres metrics role.
         # In externalSecrets/csi modes they are NOT auto-generated: your external secret
         # store must include them, or the postgres pod fails to start (missing secret key).
         - PG_METRICS_PASSWORD
@@ -196,9 +196,6 @@ images:
     tag: 8.4.0-alpine
   redisExporter:
     repository: oliver006/redis_exporter
-    tag: latest
-  postgresExporter:
-    repository: prometheuscommunity/postgres-exporter
     tag: latest
   minio:
     repository: plextrac/minio
@@ -324,13 +321,6 @@ resources:
       memory: 512Mi
     requests:
       cpu: 100m
-      memory: 256Mi
-  postgresExporter:
-    limits:
-      cpu: 200m
-      memory: 512Mi
-    requests:
-      cpu: 10m
       memory: 256Mi
 
 # Synqly Embedded — optional, in-cluster integration service (internal only, no ingress).

@@ -23,8 +23,6 @@ spec:
       annotations:
         linkerd.io/inject: enabled
         prometheus.io/scrape: "true"
-        k8s.grafana.com/metrics.container: postgres-exporter
-        k8s.grafana.com/metrics.portName: pg-exporter
       labels:
         app: postgres
         app.kubernetes.io/component: database
@@ -56,6 +54,8 @@ spec:
           value: --auth-local=scram-sha-256 --auth-host=scram-sha-256
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
+        # Used by initdb.sh to create the postgres metrics role (pg_metrics_user).
+        # Required in all secret modes because the restore re-runs initdb.sh.
         - name: PG_METRICS_USER
           valueFrom:
             secretKeyRef:
@@ -195,34 +195,6 @@ spec:
           name: initdb
         - mountPath: /dev/shm
           name: dshm
-      # Prometheus postgres-exporter sidecar. Connects to the local postgres as the
-      # metrics user created by the postgres-initdb ConfigMap (initdb.sh). Keep PG_METRICS_*
-      # in application-secrets in sync with the initdb metrics-user block, otherwise a
-      # restore that re-runs initdb.sh will fail on the missing role.
-      - name: postgres-exporter
-        image: {{ include "plextrac.image" (dict "image" .Values.images.postgresExporter "root" $) }}
-        command:
-        - /bin/postgres_exporter
-        args:
-        - --collector.stat_statements
-        env:
-        - name: DATA_SOURCE_URI
-          value: localhost:5432/core?sslmode=disable
-        - name: DATA_SOURCE_USER
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_USER
-              name: application-secrets
-        - name: DATA_SOURCE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: PG_METRICS_PASSWORD
-              name: application-secrets
-        ports:
-        - containerPort: 9187
-          name: pg-exporter
-        resources:
-          {{- toYaml .Values.resources.postgresExporter | nindent 10 }}
       restartPolicy: Always
       volumes:
       - name: postgres-data
