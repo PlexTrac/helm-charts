@@ -11,7 +11,7 @@ metadata:
   labels:
     {{- include "plextrac.commonLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.keycloak.replicas | default 1 }}
+  replicas: {{ .Values.replicaCounts.keycloak | default 1 }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -96,6 +96,6 @@ spec:
           initialDelaySeconds: 60
           periodSeconds: 10
         resources:
-          {{- toYaml .Values.keycloak.resources | nindent 10 }}
+          {{- toYaml .Values.resources.keycloak | nindent 10 }}
       restartPolicy: Always
 {{- end }}

@@ -9,7 +9,7 @@ metadata:
   labels:
     {{- include "plextrac.commonLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.synqly.replicas | default 1 }}
+  replicas: {{ .Values.replicaCounts.synqly | default 1 }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -107,6 +107,6 @@ spec:
           initialDelaySeconds: 30
           periodSeconds: 5
         resources:
-          {{- toYaml .Values.synqly.resources | nindent 10 }}
+          {{- toYaml .Values.resources.synqly | nindent 10 }}
       restartPolicy: Always
 {{- end }}

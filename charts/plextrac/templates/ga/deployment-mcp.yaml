@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/component: ai
     {{- include "plextrac.commonLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.mcp.replicas | default 1 }}
+  replicas: {{ .Values.replicaCounts.mcp | default 1 }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -122,6 +122,6 @@ spec:
           periodSeconds: 5
           failureThreshold: 5
         resources:
-          {{- toYaml .Values.mcp.resources | nindent 10 }}
+          {{- toYaml .Values.resources.mcp | nindent 10 }}
       restartPolicy: Always
 {{- end }}
