@@ -1,14 +1,12 @@
 # docker-compose to k3s migration guide
 
-Guide for Engineers to migrate an on-prem
-customer's **application data** from a running production **docker-compose**
-deployment to a production **single-node k3s** deployment.
+Guide to migrate your **application data** from a running production
+**docker-compose** deployment to a production **single-node k3s** deployment.
 
 Backup and restore are performed by scripts in the **pt-ansible** repo; this chart
 repo only provides the k3s deployment (the migration target). The backup method produces
-local per-component archives on the customer's host. Taking and retaining backups
-is normally the ops responsibility; during a migration the CSE takes a
-fresh backup as part of the cutover.
+local per-component archives on your host. You take a fresh backup as part of the
+cutover; retaining backups the rest of the time is your own responsibility.
 
 ## What moves
 
@@ -24,7 +22,7 @@ directory independently:
 
 **Not migrated:**
 - **MinIO** is transit-only. Its contents are temporary and idempotent; no persistent files live there and no backup process captures it.
-- **Keycloak / Synqly** are not part of the docker-compose stack; set them up on k3s separately if the customer uses them.
+- **Keycloak / Synqly** are not part of the docker-compose stack; set them up on k3s separately if you use them.
 
 ## Scripts (all live in pt-ansible)
 
@@ -70,7 +68,7 @@ ANSIBLE_CONFIG=ansible.gcp.cfg ansible-playbook -i inventory.gcp.yaml \
 - Log in and confirm reports, findings, and images load, and that MFA works.
 
 ### 6. Cut over
-Point the customer's DNS/traffic at the k3s ingress. Keep the compose instance intact (powered off is fine) until the customer signs off, then decommission it.
+Point your DNS/traffic at the k3s ingress. Keep the compose instance intact (powered off is fine) until you have confirmed everything works, then decommission it.
 
 ## Notes
 
