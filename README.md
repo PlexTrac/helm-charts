@@ -68,7 +68,7 @@ kubectl -n plextrac delete pvc --all
 | `charts/plextrac/examples/` | Ready-to-use configuration examples |
 | `.env.example` | Registry credentials — copy to `.env.local`, fill in, then run `scripts/setup-registry-credentials.sh` |
 | `scripts/` | Helper scripts for registry credential setup and other pre-install tasks |
-| `scripts/migration/` | Backup, restore, and CKEditor re-point scripts for the docker-compose to k3s migration |
+| `scripts/migration/` | Backup and restore scripts for the docker-compose to k3s migration |
 | `docs/user-guide.md` | Full phased installation and configuration guide |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
 | `docs/runbooks/docker-compose_to_k3s_guide.md` | docker-compose to k3s migration guide (on-prem) |

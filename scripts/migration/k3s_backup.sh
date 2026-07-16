@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 ## Script: k3s_backup.sh
 ## Version: 2026-07-06
-## Source: vendored from the pt-ansible repo (roles/plextrac/files); that repo is
-##         canonical. Keep this copy in sync with upstream.
 ## Description:  Backup a k3s cluster to a tarball compatible with docker compose backup process.
 ## Usage: ./k3s_backup.sh [options]
 

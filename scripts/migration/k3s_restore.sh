@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 ## Script: k3s_restore.sh
 ## Version: 02-02-2026
-## Source: vendored from the pt-ansible repo (roles/plextrac/files); that repo is
-##         canonical. Keep this copy in sync with upstream.
 ## Description:
 ##   Restore a k3s cluster from a tarball compatible with docker compose
 ##   backup process. This script expects tar.gz files to exist in

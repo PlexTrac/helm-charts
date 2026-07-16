@@ -4,45 +4,38 @@ Scripts for migrating PlexTrac **application data** from a docker-compose
 deployment to a single-node k3s deployment. The full procedure is in
 [docs/runbooks/docker-compose_to_k3s_guide.md](../../docs/runbooks/docker-compose_to_k3s_guide.md).
 
-These are vendored from the **pt-ansible** repo (`roles/plextrac/files`), which
-remains the canonical source. Keep them in sync with upstream.
-
 ## Contents
 
 | File | Runs on | Purpose |
 |---|---|---|
-| `k3s_backup.sh` | k3s host | Back up a running k3s cluster (couchbase, postgres, uploads) to per-component archives under `/opt/plextrac/backups/`. For backing up the k3s deployment itself; the compose source is backed up with the `plextrac backup` utility instead. |
 | `k3s_restore.sh` | k3s host | Restore the latest archive found in each of `/opt/plextrac/backups/{couchbase,postgres,uploads}/` into the cluster. |
-| `k3s_cke_fix.sh` | k3s host | Re-point CKEditor after a restore. Runs `recovery_script.js` inside the CKEditor pod to regenerate `CKEDITOR_SERVER_CONFIG`. |
-| `recovery_script.js` | inside CKEditor pod | Rotates each tenant environment's CKE secrets and prints a fresh `CKEDITOR_SERVER_CONFIG`. Invoked by `k3s_cke_fix.sh`; not run directly. |
+| `k3s_backup.sh` | k3s host | Back up a running k3s deployment (couchbase, postgres, uploads) to per-component archives under `/opt/plextrac/backups/`. Not used during the migration itself; use it for routine backups of the new deployment afterwards. The docker-compose source is backed up with the `plextrac backup` utility instead. |
 
 ## Prerequisites (on the k3s host)
 
-- `kubectl` configured for the target cluster (`export KUBECONFIG=...`).
-- `bash`, `jq`, and `tar` available.
+- `kubectl` configured for the target cluster (`export KUBECONFIG=...`) — verify with `kubectl -n plextrac get pods`.
+- `bash`, `jq`, and `tar` available — verify with `command -v bash jq tar`.
 - The app already deployed and healthy in the `plextrac` namespace.
 - For a restore: the archives staged under `/opt/plextrac/backups/{couchbase,postgres,uploads}/`.
 
 ## Usage
 
-Each script takes `-h` for options. `k3s_backup.sh` and `k3s_restore.sh` accept
-`-c`/`-p`/`-u` to limit to a single component, `-n` for a dry run, and `-v` for
+Each script takes `-h` for options. Both accept `-c`/`-p`/`-u` to limit to a
+single component (couchbase/postgres/uploads), `-n` for a dry run, and `-v` for
 verbose output. If a couchbase backup was taken with the deprecated `cbbackup`
 tool, pass `--legacy` to both the backup and the restore.
 
 ```bash
-# back up the k3s cluster (the migration backs up the compose source with `plextrac backup`)
-./k3s_backup.sh
-
 # restore the archives already staged under /opt/plextrac/backups/
 ./k3s_restore.sh
 
-# re-point CKEditor
-./k3s_cke_fix.sh
+# back up the k3s deployment (after the migration)
+./k3s_backup.sh
 ```
 
 ## Notes
 
-- `k3s_cke_fix.sh` / `recovery_script.js` rotate live secrets against
-  CKEditor's cloud. Run them only as part of a controlled migration or recovery.
 - The scripts assume the chart's default namespace (`plextrac`) and pod labels.
+- The restore replaces the data in place: it flushes the couchbase bucket and
+  drops/recreates the postgres databases before loading the archives. Run it
+  only against a deployment whose data you intend to overwrite.
