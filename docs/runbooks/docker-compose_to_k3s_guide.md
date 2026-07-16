@@ -1,14 +1,13 @@
 # docker-compose to k3s migration guide
 
-Internal guide for PlexTrac Customer Success Engineers to migrate an on-prem
+Guide for Engineers to migrate an on-prem
 customer's **application data** from a running production **docker-compose**
 deployment to a production **single-node k3s** deployment.
 
 Backup and restore are performed by scripts in the **pt-ansible** repo; this chart
-repo only provides the k3s deployment (the migration target). Nothing here is
-offsite, encrypted for handover, or shipped to us: the backup method produces
+repo only provides the k3s deployment (the migration target). The backup method produces
 local per-component archives on the customer's host. Taking and retaining backups
-is normally the customer/ops responsibility; during a migration the CSE takes a
+is normally the ops responsibility; during a migration the CSE takes a
 fresh backup as part of the cutover.
 
 ## What moves
