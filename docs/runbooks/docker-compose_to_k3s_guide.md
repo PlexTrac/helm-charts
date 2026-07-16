@@ -28,8 +28,7 @@ directory independently:
 ## Scripts
 
 The scripts live in [`scripts/migration/`](../../scripts/migration/) in this
-repo (vendored from pt-ansible, which stays canonical). Copy them onto the host
-that runs each step; see that directory's [README](../../scripts/migration/README.md)
+repo. Copy them onto the host that runs each step; see that directory's [README](../../scripts/migration/README.md) 
 for prerequisites and options.
 
 - **Backup**, compose source: the `plextrac backup` management utility that ships with the docker-compose install. (`scripts/migration/k3s_backup.sh` produces the same per-component layout from a k3s cluster, for backing up the new deployment later.)
@@ -41,40 +40,47 @@ for prerequisites and options.
 - The target **single-node k3s cluster is running with the PlexTrac app deployed and healthy** (`plextracapi` Ready, `/api/v2/health/full` passing). Standing up the cluster is a separate, prior activity.
 - The source **docker-compose instance is healthy** and reachable; note its PlexTrac version and match it on the target.
 - The scripts from [`scripts/migration/`](../../scripts/migration/) are copied onto the k3s host, and on that host you have `kubectl` pointed at the target cluster (`export KUBECONFIG=...`) plus `jq`, `tar`, and `bash`.
-- Schedule a maintenance window. The compose instance stays authoritative until cutover.
+- Schedule a maintenance window. The backup process on Compose involves downtime as does the restore process.
 
 ## Steps
 
-### 1. Back up the compose source
+### 1. Update the Manager Utility to v0.8.0
+```
+# on the docker-compose host, as the plextrac user
+plextrac util-update
+```
+This updates the manager util to v0.8.0 which uses a new couchbase backup binary, solving a few edge cases where full backups aren't taken.
+
+### 2. Back up the compose source
 ```bash
 # on the docker-compose host, as the plextrac user
 plextrac backup -y -v
 ```
 Writes the per-component archives to `/opt/plextrac/backups/{couchbase,postgres,uploads}/` on the source host.
 
-### 2. Transfer the archives to the k3s host
+### 3. Transfer the archives to the k3s host
 Copy the newest archive from **each** of `/opt/plextrac/backups/{couchbase,postgres,uploads}/` on the source into the same directories on the k3s host. Use any direct transfer (scp, or a bucket the ops team controls). The restore picks the latest file in each directory on its own.
 
-### 3. Restore into k3s
+### 4. Restore into k3s
 ```bash
 # on the k3s host, with kubectl pointed at the target cluster
 ./k3s_restore.sh
 ```
 `k3s_restore.sh` restores each component in place: Couchbase (flush `reportMe`, then `cbbackupmgr restore`), Postgres (block writes, drop and re-run `initdb.sh`, `pg_restore` of `core`/`runbooks`/`ckeditor`), Uploads (into the plextracapi PVC), and clears the cached license. If the source Couchbase archive was taken with the deprecated `cbbackup`, add `--legacy`.
 
-### 4. Re-point CKEditor
+### 5. Re-point CKEditor
 ```bash
 # on the k3s host, with kubectl pointed at the target cluster
 ./k3s_cke_fix.sh
 ```
-Regenerates `CKEDITOR_SERVER_CONFIG` so migrated reports open in the editor. This rotates live secrets against CKEditor's cloud, so run it only during the migration.
+Regenerates `CKEDITOR_SERVER_CONFIG` so migrated reports open in the editor. This rotates live secrets against CKEditor, so run it only during the migration.
 
-### 5. Validate
+### 6. Validate
 - Couchbase `reportMe` item count matches the source.
 - Postgres row counts (for example `finding`, `public.user`, `tenant`) match the source.
 - Log in and confirm reports, findings, and images load, and that MFA works.
 
-### 6. Cut over
+### 7. Cut over
 Point your DNS/traffic at the k3s ingress. Keep the compose instance intact (powered off is fine) until you have confirmed everything works, then decommission it.
 
 ## Notes
