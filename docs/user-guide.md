@@ -132,7 +132,7 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
   sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
   sudo su plextrac
   ```
-  To make plextrac passwordless, add a drop-in file (never edit /etc/sudoers directly):
+  To make plextrac passwordless (if needed), add a drop-in file (never edit /etc/sudoers directly):
 
   ```bash
   echo 'plextrac ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/plextrac
