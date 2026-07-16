@@ -224,6 +224,10 @@ replicaCounts:
   integrationWorker: 1
   contextualScoringService: 1
   datalakeMaintainer: 0   # Disabled by default for self-hosted
+  # Optional components — applied only when the matching <component>.enabled is true.
+  synqly: 1
+  keycloak: 1
+  mcp: 1
 
 resources:
   plextracapi:
@@ -316,6 +320,28 @@ resources:
     requests:
       cpu: 100m
       memory: 256Mi
+  # Optional components — used only when the matching <component>.enabled is true.
+  synqly:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  keycloak:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  mcp:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
 
 # Synqly Embedded — optional, in-cluster integration service (internal only, no ingress).
 # Keys are stored in the database (AEAD); intended for non-production. See docs.
@@ -325,14 +351,7 @@ synqly:
   organizationFullName: PlexTrac
   imagePullSecrets:
     - name: internal-registry-creds
-  replicas: 1
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: "1"
-      memory: 1Gi
+  # replicas -> replicaCounts.synqly; resources -> resources.synqly
   admin:
     username: ""                    # REQUIRED when enabled: must be an email address (Synqly org admin)
     password: ""                    # generated if empty
@@ -350,11 +369,11 @@ synqly:
 keycloak:
   enabled: false
   host: ""                          # REQUIRED when enabled: browser-facing auth hostname (e.g. auth.mycompany.com)
-  replicas: 1
+  # replicas -> replicaCounts.keycloak; resources -> resources.keycloak
   admin:
     username: admin@mycompany.com   # Keycloak bootstrap admin
     password: ""                    # generated if empty
-  tlsSecretName: keycloak-tls
+  # tlsSecretName: keycloak-tls     # optional; template defaults to keycloak-tls
   # TLS for the keycloak ingress. Three ways to provide the keycloak-tls secret:
   #   cert-manager   -> set certManager.issuer (selfSigned | letsencrypt | letsencrypt-staging) [+ email]
   #   bring-your-own -> leave certManager.issuer "" and set certManagerClusterIssuer to your Issuer/ClusterIssuer
@@ -363,13 +382,6 @@ keycloak:
     issuer: ""
     email: ""                       # required for letsencrypt / letsencrypt-staging
   certManagerClusterIssuer: ""
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: "1"
-      memory: 2Gi
   # Pulls use global.imagePullSecrets. To add keycloak-only secrets, set keycloak.imagePullSecrets
   # (merged with the global list, deduped).
   database:
@@ -385,7 +397,7 @@ keycloak:
 # main app host, not a separate hostname. See docs/user-guide.md.
 mcp:
   enabled: false
-  replicas: 1
+  # replicas -> replicaCounts.mcp; resources -> resources.mcp
   # Block /mcp/metrics at the ingress. Emits an nginx configuration-snippet annotation, which
   # REQUIRES the ingress-nginx controller to allow snippet annotations (allow-snippet-annotations:
   # true) — otherwise the admission webhook rejects the Ingress. Off by default because current
@@ -396,12 +408,5 @@ mcp:
   otel:
     enabled: false
     exporterEndpoint: ""
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
   # Pulls use global.imagePullSecrets. To add mcp-only secrets, set mcp.imagePullSecrets
   # (merged with the global list, deduped).

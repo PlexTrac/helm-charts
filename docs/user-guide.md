@@ -945,7 +945,7 @@ synqly:
 - **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
 - **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `internal-registry-creds`).
-- **Resources:** defaults are sized small for testing; raise `synqly.resources` for real workloads.
+- **Resources:** defaults are sized small for testing; raise `resources.synqly` for real workloads.
 
 ---
 
