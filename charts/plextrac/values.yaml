@@ -102,6 +102,11 @@ secrets:
         - PG_CORE_RO_USER
         - PG_CORE_RW_PASSWORD
         - PG_CORE_RW_USER
+        # PG_METRICS_* are used by initdb.sh to create the postgres metrics role.
+        # In externalSecrets/csi modes they are NOT auto-generated: your external secret
+        # store must include them, or the postgres pod fails to start (missing secret key).
+        - PG_METRICS_PASSWORD
+        - PG_METRICS_USER
         - PG_RUNBOOKS_ADMIN_PASSWORD
         - PG_RUNBOOKS_ADMIN_USER
         - PG_RUNBOOKS_DB
@@ -133,6 +138,7 @@ secrets:
           PG_CORE_RO_USER: core_ro
           PG_CORE_RW_USER: core_rw
           PG_CORE_AI_SQL_USER: ai_sql
+          PG_METRICS_USER: metrics
           PG_RUNBOOKS_DB: runbooks
           PG_RUNBOOKS_ADMIN_USER: runbooks_admin
           PG_RUNBOOKS_RO_USER: runbooks_ro
@@ -181,7 +187,8 @@ images:
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb
-    tag: 6.5.1
+    # 7.x required: backup/restore uses cbbackupmgr, which is absent from 6.5 Community Edition.
+    tag: 7.2.0
   postgres:
     repository: plextrac/plextracpostgres
     tag: stable

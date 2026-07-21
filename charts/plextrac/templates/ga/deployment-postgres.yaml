@@ -54,6 +54,18 @@ spec:
           value: --auth-local=scram-sha-256 --auth-host=scram-sha-256
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
+        # Used by initdb.sh to create the postgres metrics role (pg_metrics_user).
+        # Required in all secret modes because the restore re-runs initdb.sh.
+        - name: PG_METRICS_USER
+          valueFrom:
+            secretKeyRef:
+              key: PG_METRICS_USER
+              name: application-secrets
+        - name: PG_METRICS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PG_METRICS_PASSWORD
+              name: application-secrets
         - name: PG_CORE_DB
           valueFrom:
             secretKeyRef:

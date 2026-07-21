@@ -20,6 +20,7 @@ Notes:
 - All workloads reference `application-secrets` and `shared-secrets` via `secretKeyRef`.
 - Image pull secrets are driven by `global.imagePullSecrets`. PlexTrac images require authentication — you must configure a registry credential secret and reference it here before the chart can pull images.
 - TLS is represented as an `ExternalSecret` in `externalSecrets` mode, or a pre-created TLS secret in `manual`/CSI-backed setups.
+- In `externalSecrets`/`csi` modes the chart does not generate `application-secrets`; your store must supply **every** key in `secrets.manual.requiredKeys.application`. This includes `PG_METRICS_USER` and `PG_METRICS_PASSWORD` (used by `initdb.sh` to create the postgres metrics role): the postgres pod will not start if they are missing.
 
 ## Common prerequisites
 

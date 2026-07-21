@@ -126,13 +126,15 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
 
 **Before installing K3s:**
 
-- **Run the install as a dedicated non-root user**, not as `root`. Create one and give it `sudo` for the few privileged steps:
+- **Run the application install as a dedicated non-root user**, not as `root`. The K3s installer below is the only step that requires root — run it from your normal admin account. Everything after it (`kubectl`, `helm`, the chart install) needs no privileges at all, because the installer's `--write-kubeconfig-mode 644` makes the kubeconfig readable by any local user. The dedicated user therefore needs no `sudo` access. Create it now, run the K3s install below from your admin account, then switch:
   ```bash
   sudo useradd -m -s /bin/bash plextrac
-  sudo usermod -aG sudo plextrac      # use the 'wheel' group on RHEL/Rocky/AlmaLinux
+  # ... run the K3s install below from your admin account, then:
   sudo su plextrac
+  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+  echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
   ```
-  Run every `kubectl` and `helm` command as this user. Only running the K3s installer below uses `sudo`. Because the installer is given `--write-kubeconfig-mode 644`, the kubeconfig is readable and nothing after install (`kubectl`, `helm`, the chart install) needs `sudo`.
+  Run every `kubectl` and `helm` command from here on as this user.
 - **Give K3s an explicit node name** instead of letting it use the OS hostname. K3s derives the node name from the hostname, and a long or non-RFC-1123 cloud hostname (e.g. a GCP/AWS instance name) can exceed the 63-character limit and stop the node from registering. Rather than fighting the cloud agent that rewrites the hostname on every boot, pass `--node-name` to the installer — it is baked into the K3s systemd unit and reused on every start, so the node name survives reboots and hostname changes. The install below derives a valid name from the current hostname and pins it **before** K3s first registers the node.
 
 ```bash
