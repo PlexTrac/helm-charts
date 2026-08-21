@@ -101,22 +101,25 @@ find_container() {
   local APP="$1"
   local NAMESPACE="$2"
   local TIMEOUT="${3:-120s}"
-  local POD
-  local POD_NAME
+  local TIMEOUT_SECONDS="${TIMEOUT%s}"
+  local POD_NAME=""
+  local elapsed=0
+  local interval=3
 
-  # Waiting for $APP in $NAMESPACE for 120s or optional specified $TIMEOUT
-  if POD=$(kubectl wait --for=condition=Ready \
-    --namespace "$NAMESPACE" \
-    --selector app="$APP" po \
-    --output=name \
-    --timeout="$TIMEOUT" 2> /dev/null); then
-    POD_NAME=$(echo "$POD" | head -n 1 | cut -d / -f 2)
-    echo "$POD_NAME"
-    return 0
-  else
-    error "Failed to find pod for app:$APP, namespace:$NAMESPACE in $TIMEOUT"
-    exit 1
-  fi
+  while (( elapsed < TIMEOUT_SECONDS )); do
+    POD_NAME=$(kubectl -n "$NAMESPACE" get pods -l app="$APP" \
+      -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{" "}{.status.containerStatuses[0].ready}{"\n"}{end}' \
+      2>/dev/null | awk '$2=="Running" && $3=="true" {print $1; exit}')
+    if [[ -n "$POD_NAME" ]]; then
+      echo "$POD_NAME"
+      return 0
+    fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+  done
+
+  error "Failed to find pod for app:$APP, namespace:$NAMESPACE in ${TIMEOUT}"
+  exit 1
 }
 
 restore_couchbase() {
@@ -168,12 +171,26 @@ restore_couchbase_legacy() {
   debug "Running cbrestore..."
   # Single quotes work here
   # shellcheck disable=SC2016
-  debug "Enable flush and flushing bucket before restore"
-  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 1 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
-  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-flush -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe <<< y'
   debug "Beginning bucket flush"
+  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 1 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
+
+  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-flush -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe --force' || true
+
+  itemCount="unknown"
+  for i in $(seq 1 40); do
+    itemCount=$(kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/sh -c 'cbstats 127.0.0.1:11210 all -u "$CB_ADMIN_USER" -p "$CB_ADMIN_PASS" -b reportMe 2>/dev/null | awk "/curr_items:/{print \$2}"')
+    debug "Post-flush curr_items: ${itemCount:-unknown} (check $i/40)"
+    [[ "$itemCount" == "0" ]] && break
+    sleep 3
+  done
+
+  if [[ "$itemCount" != "0" ]]; then
+    debug "WARNING: bucket did not reach 0 items after flush (last seen: $itemCount). Proceeding anyway; cbrestore below will overwrite matching keys."
+  fi
+
   kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 0 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
   debug "Flush complete"
+
   if kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'cbrestore /backups/ http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --from-date 2022-01-01 -x conflict_resolve=0,data_only=1'; then
     debug "Completed running cbrestore"
   else
@@ -217,14 +234,25 @@ restore_couchbase_cbbackupmgr() {
     exit 1
   fi
 
-  debug "Enable flush and flushing bucket before restore"
-  # Single quotes work here
-  # shellcheck disable=SC2016
-  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 1 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
-  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-flush -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe <<< y'
   debug "Beginning bucket flush"
+  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 1 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
+
+  kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-flush -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe --force' || true
+
+  itemCount="unknown"
+  for i in $(seq 1 40); do
+    itemCount=$(kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/sh -c 'cbstats 127.0.0.1:11210 all -u "$CB_ADMIN_USER" -p "$CB_ADMIN_PASS" -b reportMe 2>/dev/null | awk "/curr_items:/{print \$2}"')
+    debug "Post-flush curr_items: ${itemCount:-unknown} (check $i/40)"
+    [[ "$itemCount" == "0" ]] && break
+    sleep 3
+  done
+
+  if [[ "$itemCount" != "0" ]]; then
+    debug "WARNING: bucket did not reach 0 items after flush (last seen: $itemCount). Proceeding anyway since restore runs with --force-updates; any leftover documents not present in the backup archive will remain post-restore."
+  fi
+
   kubectl -n plextrac exec "$couchbase_pod_name" -- /bin/bash -c 'couchbase-cli bucket-edit --enable-flush 0 -c http://127.0.0.1:8091 -u $CB_ADMIN_USER -p "$CB_ADMIN_PASS" --bucket reportMe'
-  debug "Flush complete"
+  debug "Flush step complete"
 
   debug "Running cbbackupmgr restore..."
   local cbbackupmgrOutput
@@ -274,7 +302,7 @@ restore_postgres() {
   log "[BEGIN] Restoring postgres"
   log "******************"
 
-  postgres_pod_name=$(find_container "postgres" "plextrac")
+  postgres_pod_name=$(find_container "postgres" "plextrac" "300s")
   # find latest file in /opt/plextrac/backups/postgres
   latestBackup="$(find /opt/plextrac/backups/postgres -maxdepth 1 -name '*.tar.gz' -type f  -print0 | xargs -0 stat -c"%Y %y %n" | sort -rn | head -n 1 | awk '{print $5}')"
 
@@ -296,7 +324,13 @@ restore_postgres() {
     # The postgres container name probably changed after doing this, so lets get the new name
     # Sleep for a bit to make sure the container is up
     sleep 5
-    postgres_pod_name=$(find_container "postgres" "plextrac")
+    postgres_pod_name=$(find_container "postgres" "plextrac" "300s")
+
+    debug "Waiting for postgres to actually accept connections..."
+    for i in $(seq 1 30); do
+      kubectl -n plextrac exec "$postgres_pod_name" -- pg_isready -q && break
+      sleep 2
+    done
 
     # Drop the databases, then run the initdb script again to recreate them
     debug "Dropping databases and running initdb..."
