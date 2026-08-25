@@ -268,26 +268,7 @@ Get the global admin token from logs:
 kubectl logs deployment/plextracapi -n plextrac | grep 'password'
 ```
 
-## 10. Update Database (if needed)
-
-Access the PostgreSQL database directly:
-
-```shell
-kubectl -n plextrac exec -it deployment.apps/postgres -- /bin/sh -c \
-  'PGPASSWORD=$PG_CORE_RW_PASSWORD psql -U $PG_CORE_RW_USER -d core'
-```
-
-Update the global admin password to password:
-
-```sql
-UPDATE auth_provider_plextrac 
-SET password='<new_password_hash>', 
-    last_password_reset_at=now(), 
-    last_updated_at=now() 
-WHERE user_cuid=(
-  SELECT cuid FROM "user" WHERE email='global_admin'
-);
-```
+If the above does not work (link in the log has expired or the token itself has expired), please contact support for assistance in setting the password directly.
 
 ---
 
