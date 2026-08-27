@@ -350,6 +350,25 @@ resources:
       cpu: 100m
       memory: 256Mi
 
+# Private/corporate CA trust for outbound TLS connections: SMTP relays, Jira Data
+# Center, ServiceNow, and any other endpoint whose certificate chains to a CA that
+# is not in Node's bundled Mozilla store. To trust such a CA, create a Secret in
+# the release namespace whose `ca.pem` key holds one or more concatenated PEM CA
+# certificates (include the full chain if your server omits intermediates):
+#   kubectl -n plextrac create secret generic plextrac-custom-ca \
+#     --from-file=ca.pem=/path/to/corporate-root-ca.pem
+# then restart the consuming deployments (the file is read once at process start):
+#   kubectl -n plextrac rollout restart deployment/plextracapi \
+#     deployment/notification-sender deployment/event-orchestrator \
+#     deployment/integration-worker
+# The Secret is OPTIONAL: when absent, pods start normally and each Node process
+# logs a single harmless startup warning ("Ignoring extra certs ... load failed").
+# This appends to the default trust store; public CAs keep working. Never use
+# USE_CUSTOM_MAILER_CERT=true for this problem; it disables certificate
+# verification outright instead of trusting the CA.
+customCA:
+  secretName: plextrac-custom-ca
+
 # Synqly Embedded — optional, in-cluster integration service (internal only, no ingress).
 # Keys are stored in the database (AEAD); intended for non-production. See docs.
 synqly:

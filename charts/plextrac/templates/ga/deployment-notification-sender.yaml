@@ -69,6 +69,8 @@ spec:
             secretKeyRef:
               key: INTERNAL_API_KEY_SHARED
               name: application-secrets
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/plextrac/custom-ca/ca.pem
         envFrom:
         - configMapRef:
             name: env-config
@@ -88,4 +90,15 @@ spec:
         name: notification-sender
         resources:
           {{- toYaml .Values.resources.notificationSender | nindent 10 }}
+        volumeMounts:
+        - mountPath: /etc/plextrac/custom-ca
+          name: custom-ca
+          readOnly: true
       restartPolicy: Always
+      volumes:
+      # User-supplied private CA bundle (see customCA in values.yaml). Must stay
+      # optional: a missing Secret cannot be allowed to block pod start.
+      - name: custom-ca
+        secret:
+          optional: true
+          secretName: {{ .Values.customCA.secretName | default "plextrac-custom-ca" }}

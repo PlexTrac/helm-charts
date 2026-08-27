@@ -116,6 +116,8 @@ spec:
             secretKeyRef:
               key: CLOUD_STORAGE_SECRET_KEY
               name: application-secrets
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/plextrac/custom-ca/ca.pem
         - name: NODE_OPTIONS
           value: --max-old-space-size=2800
         {{- if .Values.synqly.enabled }}
@@ -158,8 +160,17 @@ spec:
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
           name: plextracapi-vol
+        - mountPath: /etc/plextrac/custom-ca
+          name: custom-ca
+          readOnly: true
       restartPolicy: Always
       volumes:
       - name: plextracapi-vol
         persistentVolumeClaim:
           claimName: plextracapi-pvc
+      # User-supplied private CA bundle (see customCA in values.yaml). Must stay
+      # optional: a missing Secret cannot be allowed to block pod start.
+      - name: custom-ca
+        secret:
+          optional: true
+          secretName: {{ .Values.customCA.secretName | default "plextrac-custom-ca" }}
