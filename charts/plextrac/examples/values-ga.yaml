@@ -1,6 +1,71 @@
+# PlexTrac GA reference configuration — everything externalized.
+#
+# This is the "enterprise shape": all images pulled through your own registry or mirror,
+# and every secret (application, shared, registry credentials, and TLS) managed by
+# External Secrets Operator rather than by the chart. Used as the render target in
+# docs/runbooks/release-runbook.md and as the migration baseline in
+# docs/migration/overlay-to-values.md.
+#
+# For a simpler ESO setup where the chart still handles TLS and you pull from public
+# registries, start from values-external-secrets.yaml instead.
+
 global:
   namespace: plextrac
   createNamespace: true
+
+  # Re-homes EVERY image below to your registry or pull-through mirror, so the
+  # repository fields stay vendor-neutral. Images that carry their own `registry`
+  # (ckeditor, synqly) are NOT affected — override those individually.
+  # Any Docker Registry HTTP API v2 or OCI-compliant registry works: Harbor, GHCR,
+  # ECR/GCR/ACR, Nexus, Artifactory, a self-hosted registry, or a mirror.
+  image:
+    registry: registry.mycompany.com
+
+  # Created by scripts/setup-registry-credentials.sh, or synced from your secret
+  # store via secrets.externalSecrets.registryCredentials below.
+  imagePullSecrets:
+    - name: internal-registry-creds
+
+  ingress:
+    host: plextrac.mycompany.com   # Required: set to your actual domain
+    tlsSecretName: internal-tls
+    # TLS comes from the secret store in this configuration (see externalSecrets.tls),
+    # so cert-manager is left off. Set an issuer here instead if you want cert-manager
+    # to mint the certificate.
+    certManager:
+      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
+      email: ""      # required for letsencrypt / letsencrypt-staging
+    certManagerClusterIssuer: ""   # used only when certManager.issuer is ""
+
+storage:
+  # K3s built-in provisioner. On a managed cluster: GKE premium-rwo, EKS gp3,
+  # AKS managed-premium. "" uses the cluster's default StorageClass.
+  storageClassName: local-path
+  accessMode: ReadWriteOnce
+
+  # Per-claim overrides. plextracapi and whitelabeling are the only claims mounted by
+  # more than one pod, so on a MULTI-NODE cluster they need ReadWriteMany on a shared
+  # filesystem. The database claims must stay on block storage. Single-node clusters
+  # need nothing here.
+  #
+  # Rather than hand-editing this, add the matching overlay as a second -f:
+  #   -f examples/values-eks-efs.yaml (EFS) or -f examples/values-gke-filestore.yaml (Filestore)
+  # claims:
+  #   plextracapi:
+  #     accessMode: ReadWriteMany
+  #     storageClassName: <your RWX class>
+  #   whitelabeling:
+  #     accessMode: ReadWriteMany
+  #     storageClassName: <your RWX class>
+
+# Not needed on K3s: the local-path provisioner creates world-writable directories.
+# REQUIRED on every other backend (EBS, Persistent Disk, EFS, Filestore, Azure Files,
+# NFS), where volumes arrive owned by root and the app runs as uid/gid 1337. Applies to
+# the four workloads that mount the shared claims. Verify after install:
+#   kubectl -n plextrac exec deploy/plextracapi -- touch /usr/src/plextrac-api/uploads/.probe
+# podSecurityContext:
+#   fsGroup: 1337
+#   fsGroupChangePolicy: OnRootMismatch
 
 secrets:
   mode: externalSecrets
@@ -8,40 +73,46 @@ secrets:
     refreshInterval: 1h
     secretStoreRef:
       kind: ClusterSecretStore
-      name: gcp-cluster-secret-store
+      name: my-secret-store   # Name of your ClusterSecretStore
+    # ESO does NOT generate secrets. Both paths below must already hold the full key
+    # set before install, or pods crash-loop. The generated contract is in
+    # docs/pre-install-checklist.md § C.1.
     application:
       targetSecretName: application-secrets
-      remoteKey: placeholder_gcp_secret_name
+      remoteKey: plextrac/application-secrets   # Path/name of the secret in your store
     shared:
       targetSecretName: shared-secrets
-      remoteKey: plextrac-shared-secrets
-      commonProperty: allstages
-      stageProperty: ga
+      remoteKey: plextrac/shared-secrets
     registryCredentials:
-      enabled: true
-      targetSecretName: regcred-dorf
-      remoteKey: regcred-dorf
+      enabled: true                             # ESO supplies the image pull secret
+      targetSecretName: internal-registry-creds
+      remoteKey: plextrac/registry-credentials
     tls:
-      enabled: true
+      enabled: true                             # ESO supplies the TLS certificate
       targetSecretName: internal-tls
-      remoteKey: internal-tls
+      remoteKey: plextrac/tls-cert              # MUST be a PKCS#12 bundle, not PEM
 
+# Repositories are vendor-neutral: global.image.registry above prefixes them all.
+# Tags are "stable" here so this file stays valid as a render target; pin them to
+# tested versions for an actual GA deployment.
 images:
   backend:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
-    tag: 2.27.4
+    repository: plextrac/plextracapi
+    tag: stable
   nginx:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
-    tag: 2.27.4
-  ruxpin:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/ruxpin
-    tag: 2.18.2
+    repository: plextrac/plextracnginx
+    tag: stable
   ckeditor:
-    registry: registry.dorf.plextrac.ninja
-    repository: ckeditor-registry-proxy/cs
-    tag: 4.25.0
+    # Carries its own registry, so global.image.registry does not apply. Point this at
+    # your ckeditor pull-through proxy if you mirror it.
+    registry: docker.cke-cs.com
+    repository: cs
+    tag: latest
+  plextracdb:
+    repository: plextrac/plextracdb
+    tag: 7.2.0
   postgres:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracpostgres
+    repository: plextrac/plextracpostgres
     tag: stable
   redis:
     repository: redis
@@ -49,12 +120,63 @@ images:
   redisExporter:
     repository: oliver006/redis_exporter
     tag: latest
-  minioBootstrap:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextrac-minio-bootstrap
-    tag: stable
   minio:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/minio
+    repository: plextrac/minio
     tag: latest
+  minioBootstrap:
+    repository: plextrac/plextrac-minio-bootstrap
+    tag: stable
+  synqly:
+    # Also carries its own registry — set it to your quay proxy/mirror to override.
+    registry: quay.io
+    repository: synqly/embedded
+    tag: embedded-2026.06.19
+  keycloak:
+    repository: plextrac/plextrac-keycloak
+    tag: stable
+  # keycloakSetup:                            # optional; defaults to the backend image (contains the CLI). Set for a lean build.
+  #   repository: plextrac/plextracapi-keycloak-setup
+  #   tag: stable
+  mcp:
+    repository: plextrac/mcp
+    tag: stable
+
+replicaCounts:
+  plextracapi: 3
+  ckeditor: 3
+  eventOrchestrator: 1
+  notificationEngine: 1
+  notificationSender: 1
+  integrationWorker: 1
+  contextualScoringService: 1
+  datalakeMaintainer: 0
+
+# Optional in-cluster Synqly integration service (disabled by default).
+# Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
+# synqly:
+#   enabled: true
+#   admin:
+#     username: admin@mycompany.com   # REQUIRED — must be an email address
+#   database:
+#     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster Keycloak OIDC/SSO broker (disabled by default). Browser-facing: needs its own
+# hostname + TLS, and a custom backend image with the on-prem realm migration. See docs/user-guide.md.
+# keycloak:
+#   enabled: true
+#   host: auth.mycompany.com          # REQUIRED — browser-facing auth hostname
+#   certManager:
+#     issuer: letsencrypt             # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
+#     email: admin@mycompany.com
+#   database:
+#     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
+
+# Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
+# REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
+# mcp:
+#   enabled: true
+#   otel:
+#     enabled: false          # set true + exporterEndpoint for your OTLP collector
 
 # Extra non-secret env vars injected into the env-config ConfigMap (see the chart's values.yaml).
 # extraEnv:

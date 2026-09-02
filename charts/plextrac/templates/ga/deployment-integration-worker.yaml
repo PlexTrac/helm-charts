@@ -39,6 +39,7 @@ spec:
         serviceName: integration-worker
     spec:
       {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
+      {{- include "plextrac.podSecurityContext" . | nindent 6 }}
       containers:
       - args:
         - run

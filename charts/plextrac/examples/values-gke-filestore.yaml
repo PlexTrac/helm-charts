@@ -1,0 +1,97 @@
+# GKE multi-node storage overlay: Persistent Disk for the databases, Filestore for
+# the two shared claims.
+#
+# Layer this on top of a base values file:
+#   helm upgrade --install plextrac charts/plextrac \
+#     -f charts/plextrac/examples/values-self-hosted.yaml \
+#     -f charts/plextrac/examples/values-gke-filestore.yaml \
+#     --set global.ingress.host=plextrac.mycompany.com
+#
+# WHY: plextracapi-pvc and whitelabeling-pvc are each mounted by more than one pod
+# (see the storage.claims comments in values.yaml). Persistent Disk is
+# ReadWriteOnce, so on a multi-node cluster those pods cannot all mount them.
+# Filestore is NFS, so any node in the region can mount it. The database claims
+# stay on PD: putting a Couchbase or Postgres data directory on NFS is a bad idea
+# for latency and locking reasons.
+#
+# ZONES BEHAVE DIFFERENTLY THAN ON AWS: a pod in another zone CAN mount a zonal
+# Filestore instance, it just pays cross-zone egress and a little latency. So the
+# "standard" tier below works fine on a regional cluster. Zonality here is a
+# durability and cost tradeoff, not an availability cliff the way a cross-AZ EBS
+# attach is. If a zone outage taking down exports and analytics is unacceptable,
+# use the regional tier (option b at the bottom of this file).
+#
+# -----------------------------------------------------------------------------
+# PREREQUISITES — complete these before installing
+# -----------------------------------------------------------------------------
+# 1. Enable the Filestore CSI driver on the cluster:
+#
+#      gcloud container clusters update <cluster> \
+#        --update-addons=GcpFilestoreCsiDriver=ENABLED
+#
+# 2. Create the StorageClass. tier "standard" is Basic HDD, the cheapest tier,
+#    with a 100 GiB minimum instance size on GKE:
+#
+#      apiVersion: storage.k8s.io/v1
+#      kind: StorageClass
+#      metadata:
+#        name: filestore-plextrac
+#      provisioner: filestore.csi.storage.gke.io
+#      parameters:
+#        tier: standard        # Basic HDD. "premier" = Basic SSD, "enterprise" = multishare-capable
+#        network: default      # must be the VPC your cluster runs in
+#      reclaimPolicy: Retain
+#      volumeBindingMode: Immediate
+#      allowVolumeExpansion: true
+# -----------------------------------------------------------------------------
+
+storage:
+  # Databases and MinIO stay on Persistent Disk. Use standard-rwo for HDD.
+  storageClassName: premium-rwo
+  accessMode: ReadWriteOnce
+
+  claims:
+    # Filestore's "standard" tier has a 100 GiB minimum instance size and the CSI
+    # driver creates one instance per PVC, so a request below the tier minimum
+    # fails to provision. 100Gi is the billing floor, not an estimate of the data
+    # (which is a few hundred MB). See the cost note at the bottom of this file.
+    plextracapi:
+      accessMode: ReadWriteMany
+      storageClassName: filestore-plextrac
+      size: 100Gi
+    whitelabeling:
+      accessMode: ReadWriteMany
+      storageClassName: filestore-plextrac
+      size: 100Gi
+
+# The app image runs as uid/gid 1337 and the chart sets no fsGroup by default, so
+# a root-owned share root would be unwritable. Verify a write succeeds on the
+# first install: `kubectl exec deploy/plextracapi -- touch uploads/.probe`
+podSecurityContext:
+  fsGroup: 1337
+  fsGroupChangePolicy: OnRootMismatch
+
+# -----------------------------------------------------------------------------
+# COST NOTE AND ALTERNATIVES
+# -----------------------------------------------------------------------------
+# As written this provisions TWO 100 GiB Filestore instances to hold a few hundred
+# MB, because the CSI driver creates one instance per PVC and Basic-tier instances
+# expose a single share. Options if that matters:
+#
+# a) One instance, subdirectory PVs (cheapest). Pre-create a single 100 GiB
+#    Filestore instance, install csi-driver-nfs
+#    (https://github.com/kubernetes-csi/csi-driver-nfs), and point a StorageClass
+#    at the Filestore IP and share name. Each PVC becomes a subdirectory of that
+#    one instance, so both claims fit in 100 GiB and the "size: 100Gi" overrides
+#    above can be dropped. Adds one component GKE does not manage for you.
+#
+# b) Regional tier, to survive a zone outage:
+#      parameters: { tier: regional, network: default }
+#    The lower capacity range is 100 GiB only if your project has the
+#    small-capacity-instances feature enabled; otherwise it is 1 TiB. Check before
+#    you budget for it.
+#
+# c) Enterprise multishares. Shares go as small as 10 GiB with up to 80 shares per
+#    instance, but the underlying enterprise instance starts at 1 TiB, so this only
+#    pays off if the wider platform has many other RWX PVCs to pack onto it.
+# -----------------------------------------------------------------------------

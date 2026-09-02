@@ -102,7 +102,3 @@ spec:
         resources:
           {{- toYaml .Values.resources.ckeditor | nindent 10 }}
       restartPolicy: Always
-      volumes:
-      - name: plextracapi-vol
-        persistentVolumeClaim:
-          claimName: plextracapi-pvc

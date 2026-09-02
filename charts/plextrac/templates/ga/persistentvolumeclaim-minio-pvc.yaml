@@ -8,9 +8,4 @@ metadata:
   name: minio-pvc
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: {{ .Values.storage.storageClassName }}
+  {{- include "plextrac.pvcSpec" (dict "claim" "minio" "size" "5Gi" "root" $) | nindent 2 }}
