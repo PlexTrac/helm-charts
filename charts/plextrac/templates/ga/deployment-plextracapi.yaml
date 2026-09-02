@@ -41,6 +41,7 @@ spec:
         serviceName: core-backend
     spec:
       {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
+      {{- include "plextrac.podSecurityContext" . | nindent 6 }}
       containers:
       - args:
         - ./dist/apps/plextracapi/src/index.js

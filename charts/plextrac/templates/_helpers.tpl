@@ -120,3 +120,43 @@ Call as: {{ include "plextrac.image" (dict "image" .Values.images.<component> "r
 {{- printf "%s:%s" .image.repository .image.tag -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Render the spec body of a PersistentVolumeClaim, resolving per-claim overrides from
+.Values.storage.claims.<claim> and falling back to the storage.* defaults.
+
+Call as:
+  {{- include "plextrac.pvcSpec" (dict "claim" "plextracapi" "size" "5Gi" "root" $) | nindent 2 }}
+
+"size" is the chart's built-in default for that claim; storage.claims.<claim>.size
+overrides it. Per-claim keys, all optional: accessMode, storageClassName, size.
+Setting storageClassName to "" omits the field so the cluster default class is used.
+*/}}
+{{- define "plextrac.pvcSpec" -}}
+{{- $claims := .root.Values.storage.claims | default dict -}}
+{{- $c := (index $claims .claim) | default dict -}}
+{{- $sc := .root.Values.storage.storageClassName -}}
+{{- if hasKey $c "storageClassName" -}}
+{{- $sc = $c.storageClassName -}}
+{{- end -}}
+accessModes:
+- {{ $c.accessMode | default .root.Values.storage.accessMode | default "ReadWriteOnce" }}
+resources:
+  requests:
+    storage: {{ $c.size | default .size }}
+{{- if $sc }}
+storageClassName: {{ $sc }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Pod-level securityContext for the workloads that mount the shared claims.
+Emits nothing when .Values.podSecurityContext is empty.
+Call as: {{- include "plextrac.podSecurityContext" . | nindent 6 }}
+*/}}
+{{- define "plextrac.podSecurityContext" -}}
+{{- with .Values.podSecurityContext -}}
+securityContext:
+{{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end -}}

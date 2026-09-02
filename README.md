@@ -70,6 +70,7 @@ kubectl -n plextrac delete pvc --all
 | `scripts/` | Helper scripts for registry credential setup and other pre-install tasks |
 | `scripts/migration/` | Backup and restore scripts for the docker-compose to k3s migration |
 | `docs/user-guide.md` | Full phased installation and configuration guide |
+| `docs/pre-install-checklist.md` | Every pre-install decision and the values field it maps to, plus the secret-key contract |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
 | `docs/runbooks/docker-compose_to_k3s_guide.md` | docker-compose to k3s migration guide (on-prem) |
 | `docs/migration/` | Kustomize → Helm migration guides |

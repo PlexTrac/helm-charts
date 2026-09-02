@@ -38,7 +38,7 @@ spec:
       containers:
       - env:
         - name: API_FQDN
-          value: plextracapi.plextrac.svc.cluster.local
+          value: plextracapi.{{ include "plextrac.namespace" . }}.svc.cluster.local
         - name: CLIENT_DOMAIN_NAME
           valueFrom:
             configMapKeyRef:
@@ -109,6 +109,11 @@ spec:
       - configMap:
           name: customer-curated-waf-rules
         name: customer-curated-waf-rules
+      # /etc/nginx/conf.d is fully derived on every pod start: the initContainer copies
+      # the image's conf.d and layers in customer_curated.rules from the ConfigMap, then
+      # the image entrypoint (nginx_init.sh) regenerates mod_minio_location.conf and the
+      # naxsi rules from env. Nothing here is user-generated or non-reproducible, so an
+      # emptyDir is correct. It also avoids a PVC carrying stale conf.d files forward
+      # across image upgrades (the initContainer's `cp -R` overwrites but never deletes).
       - name: nginx-config-data
-        persistentVolumeClaim:
-          claimName: nginx-config-pvc
+        emptyDir: {}

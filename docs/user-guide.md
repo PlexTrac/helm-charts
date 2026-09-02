@@ -65,6 +65,8 @@ Read through this checklist before touching any `helm` command. Installing the c
 
 **Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
 
+> **Multi-node clusters** need one extra step: two of the claims are mounted by pods that can land on different nodes, so they must move to `ReadWriteMany` storage. See [Reference: Storage configuration](#reference-storage-configuration) for the EKS and GKE overlays. Single-node clusters need nothing beyond a StorageClass.
+
 ### Software requirements
 
 | Tool | Minimum version |
@@ -579,7 +581,7 @@ secrets:
 
 See `charts/plextrac/examples/values-external-secrets.yaml` for a complete example.
 
-> **Required keys:** in ESO mode the chart does **not** generate secrets — your secret store must already contain the full `application-secrets` key set (all keys) **and** the `shared-secrets` keys before install, or pods crash-loop on startup. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` (see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
+> **Required keys:** in ESO mode the chart does **not** generate secrets — your secret store must already contain the full `application-secrets` key set (all keys) **and** the `shared-secrets` keys before install, or pods crash-loop on startup. The key contract is listed in full, generated from the chart, in [docs/pre-install-checklist.md](pre-install-checklist.md#c1-the-key-contract) (source of truth: `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml`; see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
 
 ### CSI Secrets Store mode
 
@@ -607,7 +609,7 @@ secrets:
 
 See `charts/plextrac/examples/values-csi-aws.yaml` and `values-csi-gcp.yaml` for provider-specific examples.
 
-> **Required keys:** like ESO mode, CSI mode does **not** generate secrets — your provider store must contain the full `application-secrets` and `shared-secrets` key sets before install. The authoritative key contract is `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml` (see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
+> **Required keys:** like ESO mode, CSI mode does **not** generate secrets — your provider store must contain the full `application-secrets` and `shared-secrets` key sets before install. The key contract is listed in full, generated from the chart, in [docs/pre-install-checklist.md](pre-install-checklist.md#c1-the-key-contract) (source of truth: `secrets.manual.requiredKeys` in `charts/plextrac/values.yaml`; see also [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md)).
 
 For full details on all three modes, see [docs/runbooks/secrets-modes.md](runbooks/secrets-modes.md).
 
@@ -615,11 +617,15 @@ For full details on all three modes, see [docs/runbooks/secrets-modes.md](runboo
 
 ## Reference: Storage configuration
 
-The chart creates 7 PersistentVolumeClaims. All use a single StorageClass:
+The chart creates 6 PersistentVolumeClaims, or 8 when the optional Keycloak and Synqly
+components use dedicated databases. Every claim resolves its StorageClass, access mode,
+and size from `storage.*`, with optional per-claim overrides.
 
 ```yaml
 storage:
-  storageClassName: local-path   # default — K3s built-in provisioner
+  storageClassName: local-path   # default for every claim - K3s built-in provisioner
+  accessMode: ReadWriteOnce      # default for every claim
+  claims: {}                     # per-claim overrides, see below
 ```
 
 | Platform | Recommended StorageClass | Notes |
@@ -627,7 +633,7 @@ storage:
 | K3s | `local-path` | Built-in, no change needed |
 | GKE | `premium-rwo` | SSD-backed; use `standard-rwo` for HDD |
 | AKS | `managed-premium` | SSD-backed; use `default` for HDD |
-| EKS | `gp3` | Requires EBS CSI driver add-on |
+| EKS | `gp3` | Requires the EBS CSI driver add-on |
 
 Check what StorageClasses are available:
 
@@ -635,9 +641,107 @@ Check what StorageClasses are available:
 kubectl get storageclass
 ```
 
-> **Important:** Set `storage.storageClassName` **before first install**. Changing it after the initial install does not migrate existing PVCs — PVCs are immutable after creation. Migration requires backing up data, deleting and recreating PVCs, and restoring.
+### The claims
 
-> **This chart targets a single-node K3s cluster.** `plextracapi-pvc` is `ReadWriteOnce` and is shared by all `plextracapi` replicas (default 3) and the `migrations-and-etl` Job — which is fine when everything runs on one node. Multi-node is not a supported topology: a `ReadWriteOnce` volume attaches to a single node, so pods scheduled elsewhere would get stuck `FailedAttachVolume`. If you must run multi-node, switch these claims to a `ReadWriteMany`-capable StorageClass.
+| Claim | Default size | Mounted by | Shared |
+|---|---|---|---|
+| `plextracapi` | 5Gi | `plextracapi` (3 replicas), `event-orchestrator`, `integration-worker`, `migrations-and-etl` Job | **Yes** |
+| `whitelabeling` | 1Mi | `plextracapi` (3 replicas) | **Yes** |
+| `plextracdb` | 15Gi | `plextracdb` StatefulSet | No |
+| `postgres` | 15Gi | `postgres` | No |
+| `minio` | 5Gi | `minio` | No |
+| `redis` | 1Gi | `redis` StatefulSet | No |
+| `keycloakPostgres` | 8Gi | `keycloak-postgres` (optional) | No |
+| `synqlyPostgres` | 8Gi | `synqly-postgres` (optional) | No |
+
+The two shared claims hold durable data that one pod writes and another reads: custom
+export templates, the per-tenant analytics graph, and admin white-label locale
+overrides. That is why they are shared rather than per-pod.
+
+### Single-node clusters
+
+Nothing to configure beyond `storage.storageClassName`. A `ReadWriteOnce` volume
+restricts to one *node*, not one pod, so multiple pods on the same node share it fine.
+
+### Multi-node clusters
+
+The two shared claims need `ReadWriteMany` on a shared filesystem, because their pods
+can be scheduled onto different nodes. Use one of the ready-made overlays:
+
+```bash
+helm upgrade --install plextrac ./charts/plextrac -f charts/plextrac/examples/values-self-hosted.yaml -f charts/plextrac/examples/values-eks-efs.yaml --set global.ingress.host=plextrac.mycompany.com
+```
+
+```bash
+helm upgrade --install plextrac ./charts/plextrac -f charts/plextrac/examples/values-self-hosted.yaml -f charts/plextrac/examples/values-gke-filestore.yaml --set global.ingress.host=plextrac.mycompany.com
+```
+
+The first puts the databases on EBS `gp3` and the shared claims on EFS; the second puts
+the databases on Persistent Disk and the shared claims on Filestore. Each overlay
+carries its own prerequisites in comments (CSI driver add-ons, the filesystem to
+create, and the StorageClass manifest). Read it before installing.
+
+For any other RWX backend (Azure Files, NFS, Longhorn, CephFS):
+
+```yaml
+storage:
+  storageClassName: <block storage class for the databases>
+  claims:
+    plextracapi:
+      accessMode: ReadWriteMany
+      storageClassName: <your RWX class>
+    whitelabeling:
+      accessMode: ReadWriteMany
+      storageClassName: <your RWX class>
+```
+
+> **Keep the databases on block storage.** Only `plextracapi` and `whitelabeling` need
+> RWX. Pointing the Couchbase, Postgres, Redis, or MinIO claims at NFS costs you latency
+> and file-locking correctness for no benefit.
+
+Some backends have a minimum volume size that exceeds the chart defaults. Filestore's
+`standard` tier, for example, has a 100 GiB instance minimum, and a smaller request
+fails to provision. Override it per claim:
+
+```yaml
+storage:
+  claims:
+    plextracapi:
+      size: 100Gi
+```
+
+### Filesystem permissions on non-K3s storage
+
+The application image runs as uid/gid **1337** (`plextrac`). A freshly provisioned block
+volume or NFS export arrives owned by `root`, so the application cannot write to it.
+K3s's `local-path` provisioner happens to create world-writable directories, which is
+why K3s installs need nothing here.
+
+On **any other backend**, set:
+
+```yaml
+podSecurityContext:
+  fsGroup: 1337
+  fsGroupChangePolicy: OnRootMismatch
+```
+
+This is applied to the four workloads that mount the shared claims. Both cloud overlays
+above already set it. On EFS, also set `uid: "1337"` and `gid: "1337"` on the access
+point in your StorageClass, because the access point's POSIX user is what actually
+governs file ownership there.
+
+Verify after install:
+
+```bash
+kubectl -n plextrac exec deploy/plextracapi -- touch /usr/src/plextrac-api/uploads/.probe
+```
+
+> **Set storage values before first install.** Changing `storageClassName`, `accessMode`,
+> or `size` afterwards does not migrate existing data. A bound PVC's StorageClass and
+> access mode are immutable, and a size change only works if the StorageClass allows
+> expansion. Migration means backing up, deleting and recreating the PVCs, then
+> restoring. `scripts/migration/k3s_backup.sh` and `k3s_restore.sh` cover the `uploads`
+> volume alongside Couchbase and Postgres.
 
 ---
 

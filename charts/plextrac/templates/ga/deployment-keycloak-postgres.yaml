@@ -8,13 +8,7 @@ metadata:
   labels:
     {{- include "plextrac.commonLabels" . | nindent 4 }}
 spec:
-  accessModes: ["ReadWriteOnce"]
-  resources:
-    requests:
-      storage: {{ .Values.keycloak.database.storage | default "8Gi" }}
-  {{- with .Values.storage.storageClassName }}
-  storageClassName: {{ . }}
-  {{- end }}
+  {{- include "plextrac.pvcSpec" (dict "claim" "keycloakPostgres" "size" (.Values.keycloak.database.storage | default "8Gi") "root" $) | nindent 2 }}
 ---
 apiVersion: v1
 kind: Service

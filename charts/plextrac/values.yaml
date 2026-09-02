@@ -23,7 +23,54 @@ global:
     certManagerClusterIssuer: ""
 
 storage:
-  storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
+  # Default StorageClass for every claim below.
+  #   K3s: "local-path" (built-in)      GKE: "standard-rwo" / "premium-rwo"
+  #   EKS: "gp3" (needs the EBS CSI addon)   AKS: "default" / "managed-premium"
+  # Set to "" to fall back to the cluster's default StorageClass.
+  storageClassName: local-path
+
+  # Default access mode for every claim below.
+  accessMode: ReadWriteOnce
+
+  # Per-claim overrides. Set any of accessMode / storageClassName / size;
+  # anything omitted inherits the defaults above.
+  #
+  # MULTI-NODE CLUSTERS: plextracapi and whitelabeling are the only claims mounted
+  # by more than one pod. plextracapi-pvc is mounted by plextracapi (3 replicas by
+  # default), event-orchestrator, integration-worker and the migrations-and-etl Job.
+  # whitelabeling-pvc is mounted by every plextracapi replica. Both hold durable
+  # data that one pod writes and another reads: custom export templates, the
+  # per-tenant analytics graph, and admin white-label locale overrides. On a cluster
+  # where those pods can be scheduled to different nodes both claims need
+  # ReadWriteMany on a shared filesystem (EFS on EKS, Filestore on GKE, Azure Files
+  # on AKS, NFS on-prem).
+  #
+  # The database claims must STAY on block storage. Do not point them at NFS.
+  # Ready-made overlays: examples/values-eks-efs.yaml, examples/values-gke-filestore.yaml
+  claims:
+    plextracapi: {}        # 5Gi   shared, needs RWX on multi-node
+    whitelabeling: {}      # 1Mi   shared, needs RWX on multi-node
+    plextracdb: {}         # 15Gi  Couchbase data, block storage only
+    postgres: {}           # 15Gi  Postgres data, block storage only
+    redis: {}              # 1Gi   block storage only
+    minio: {}              # 5Gi   block storage only
+    keycloakPostgres: {}   # 8Gi   block storage only (or keycloak.database.storage)
+    synqlyPostgres: {}     # 8Gi   block storage only (or synqly.database.storage)
+
+# Pod-level securityContext applied to the four workloads that mount the shared
+# claims: plextracapi, event-orchestrator, integration-worker, migrations-and-etl.
+#
+# The application image runs as uid/gid 1337 ("plextrac", see the backend
+# Dockerfile). A freshly provisioned block volume or NFS export arrives owned by
+# root, so without an fsGroup the app cannot write to it. K3s's local-path
+# provisioner happens to create world-writable directories, which is why this
+# defaults to empty and K3s installs work unchanged.
+#
+# On EKS/EFS, GKE/Filestore, AKS/Azure Files or any NFS backend, set:
+#   podSecurityContext:
+#     fsGroup: 1337
+#     fsGroupChangePolicy: OnRootMismatch
+podSecurityContext: {}
 
 # Extra non-secret environment variables injected into the env-config ConfigMap (consumed by
 # plextracapi and other components via envFrom). Plain key/value pairs; values are always quoted
