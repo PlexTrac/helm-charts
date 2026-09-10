@@ -230,8 +230,6 @@ replicaCounts:
 #   CUSTOM_TIMEOUT_MS: "30000"
 ```
 
-Paste the registry credentials snippet from step 5 into this file.
-
 ## 7. Install PlexTrac
 
 Install the PlexTrac Helm chart:
