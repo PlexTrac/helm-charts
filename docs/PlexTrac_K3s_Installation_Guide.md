@@ -72,12 +72,12 @@ cp .env.example .env.local
 
 Edit `.env.local` and set the following required variables: 
 
-- `DOCKER_REGISTRY`
-- `DOCKER_USERNAME`
-- `DOCKER_PASSWORD`
-- `CKEDITOR_DOCKER_SERVER`
-- `CKEDITOR_DOCKER_USERNAME`
-- `CKEDITOR_DOCKER_PASSWORD`
+- `DOCKER_REGISTRY`: (Default value will be pulled from my-values.yaml file)
+- `DOCKER_USERNAME`: ptcustomers (#DOCKER_HUB_USER)
+- `DOCKER_PASSWORD`: (#DOCKER_HUB_KEY)
+- `CKEDITOR_DOCKER_SERVER`: docker.cke.cs.com (#IMAGE_REGISTRY)
+- `CKEDITOR_DOCKER_USERNAME`: cs (#IMAGE_REGISTRY_USER)
+- `CKEDITOR_DOCKER_PASSWORD`: (#IMAGE_REGISTRY_PASS)
 
 Create Kubernetes registry secrets:
 
