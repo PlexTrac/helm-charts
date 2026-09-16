@@ -8,9 +8,4 @@ metadata:
   name: redis-pvc
   namespace: {{ include "plextrac.namespace" . }}
 spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: {{ .Values.storage.storageClassName }}
+  {{- include "plextrac.pvcSpec" (dict "claim" "redis" "size" "1Gi" "root" $) | nindent 2 }}

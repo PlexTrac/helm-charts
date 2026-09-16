@@ -111,7 +111,7 @@ global:
     - name: plextrac-registry-creds
     - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
   image:
-      registry: "registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro"   # set to your registry/mirror to re-home all images except ckeditor
+      registry: "registry.mycompany.com"   # set to your registry/mirror to re-home all images except ckeditor
   ingress:
     host: plextrac.local   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls
@@ -153,8 +153,10 @@ images:
     repository: plextrac/plextracnginx
     tag: stable
   ckeditor:
-    registry: registry.dorf.plextrac.ninja
-    repository: ckeditor-registry-proxy/cs
+    # CKEditor carries its own registry, so global.image.registry does not apply.
+    # Point this at your pull-through proxy if you mirror it.
+    registry: docker.cke-cs.com
+    repository: cs
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb

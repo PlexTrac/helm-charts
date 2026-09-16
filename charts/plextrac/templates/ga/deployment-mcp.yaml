@@ -33,9 +33,7 @@ spec:
     spec:
       {{- include "plextrac.mcp.imagePullSecrets" . | nindent 6 }}
       securityContext:
-        runAsUser: 1337
-        runAsGroup: 1337
-        fsGroup: 1337
+        runAsNonRoot: true
       containers:
       - name: mcp
         image: {{ include "plextrac.image" (dict "image" .Values.images.mcp "root" $) }}

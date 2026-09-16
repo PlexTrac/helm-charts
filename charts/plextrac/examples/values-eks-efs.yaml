@@ -1,0 +1,79 @@
+# EKS multi-node storage overlay: EBS for the databases, EFS for the two shared claims.
+#
+# Layer this on top of a base values file:
+#   helm upgrade --install plextrac charts/plextrac \
+#     -f charts/plextrac/examples/values-self-hosted.yaml \
+#     -f charts/plextrac/examples/values-eks-efs.yaml \
+#     --set global.ingress.host=plextrac.mycompany.com
+#
+# WHY: plextracapi-pvc and whitelabeling-pvc are each mounted by more than one pod
+# (see the storage.claims comments in values.yaml). An EBS volume attaches to one
+# node and lives in one availability zone, so on a multi-node cluster those pods
+# cannot all mount them. EFS is a regional NFS filesystem with a mount target per
+# AZ, which fixes both the multi-attach and the zone problem. The database claims
+# stay on EBS gp3. Do not move those to EFS.
+#
+# -----------------------------------------------------------------------------
+# PREREQUISITES — complete these before installing
+# -----------------------------------------------------------------------------
+# 1. Install both CSI drivers as EKS add-ons:
+#
+#      eksctl create addon --cluster <cluster> --name aws-ebs-csi-driver
+#      eksctl create addon --cluster <cluster> --name aws-efs-csi-driver
+#
+# 2. Create an EFS filesystem in the cluster VPC, with a mount target in every
+#    subnet your nodes run in and a security group allowing TCP 2049 from the
+#    node security group.
+#
+#    Use ELASTIC throughput mode, not Bursting. This filesystem holds only a few
+#    hundred MB, and a Bursting filesystem under 20 GiB drops to a 1 MiB/s floor
+#    once burst credits are exhausted. The import path stages files up to 1 GB,
+#    which would take roughly 15 minutes at that rate.
+#
+# 3. Create the EFS StorageClass. uid/gid MUST be 1337: the application image
+#    runs as uid/gid 1337 ("plextrac"), and on EFS the access point's POSIX user
+#    is what governs file ownership.
+#
+#      apiVersion: storage.k8s.io/v1
+#      kind: StorageClass
+#      metadata:
+#        name: efs-plextrac
+#      provisioner: efs.csi.aws.com
+#      parameters:
+#        provisioningMode: efs-ap
+#        fileSystemId: fs-0123456789abcdef0     # <-- replace with your filesystem ID
+#        directoryPerms: "0775"
+#        uid: "1337"
+#        gid: "1337"
+#        basePath: "/plextrac"
+#        ensureUniqueDirectory: "true"
+#      reclaimPolicy: Retain
+#      volumeBindingMode: Immediate
+#
+# 4. Confirm a gp3 StorageClass exists (`kubectl get sc`). Older EKS clusters
+#    still default to gp2; create gp3 if it is missing, or change the value below.
+# -----------------------------------------------------------------------------
+
+storage:
+  # Databases and MinIO stay on block storage.
+  storageClassName: gp3
+  accessMode: ReadWriteOnce
+
+  claims:
+    # The two shared claims move to EFS with ReadWriteMany. EFS grows on demand
+    # and ignores the requested size, so the chart defaults below cost nothing.
+    plextracapi:
+      accessMode: ReadWriteMany
+      storageClassName: efs-plextrac
+    whitelabeling:
+      accessMode: ReadWriteMany
+      storageClassName: efs-plextrac
+
+# The app image runs as uid/gid 1337 and the chart sets no fsGroup by default, so
+# a root-owned volume root would be unwritable. On EFS the access point uid/gid
+# from step 3 is the primary mechanism; fsGroup is set here so the supplemental
+# group is present in-container and so this file still works if you move to a
+# different RWX backend.
+podSecurityContext:
+  fsGroup: 1337
+  fsGroupChangePolicy: OnRootMismatch

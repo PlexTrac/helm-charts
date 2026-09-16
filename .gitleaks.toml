@@ -19,6 +19,8 @@ title = "PlexTrac Helm Charts"
     # Kubernetes Secret *resource names* (not secret values)
     '''(application|shared)-secrets''',
     '''internal-tls''',
+    # Historical only: this secret name was replaced by internal-registry-creds.
+    # Keep the entry — the CI job scans full git history, where it still appears.
     '''regcred-dorf''',
     # Placeholder marker strings used in example files
     '''(?i)placeholder_''',

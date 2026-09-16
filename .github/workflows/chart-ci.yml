@@ -60,6 +60,11 @@ jobs:
       - name: Helm template smoke test
         run: helm template plextrac charts/plextrac > /tmp/plextrac-render.yaml
 
+      - name: Secret-key reference is in sync with the chart
+        # docs/pre-install-checklist.md section C.1 is generated from the chart.
+        # This fails the build if requiredKeys changed without regenerating the doc.
+        run: scripts/gen-secrets-reference.py --check
+
       - name: Quick secret pattern sanity check
         # Lightweight fallback — gitleaks (in the secrets-scan job) is the
         # authoritative scanner.  This catches obvious plaintext values that

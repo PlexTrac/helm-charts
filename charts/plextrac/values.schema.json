@@ -5,108 +5,260 @@
     "global": {
       "type": "object",
       "properties": {
-        "namespace": { "type": "string", "minLength": 1 },
-        "createNamespace": { "type": "boolean" },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "createNamespace": {
+          "type": "boolean"
+        },
         "imagePullSecrets": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "name": { "type": "string" }
+              "name": {
+                "type": "string"
+              }
             },
-            "required": ["name"]
+            "required": [
+              "name"
+            ]
           }
         },
         "image": {
           "type": "object",
           "properties": {
-            "registry": { "type": "string" }
+            "registry": {
+              "type": "string"
+            }
           }
         },
         "ingress": {
           "type": "object",
           "properties": {
-            "host": { "type": "string" },
-            "tlsSecretName": { "type": "string", "minLength": 1 },
+            "host": {
+              "type": "string"
+            },
+            "tlsSecretName": {
+              "type": "string",
+              "minLength": 1
+            },
             "certManager": {
               "type": "object",
               "properties": {
-                "issuer": { "type": "string", "enum": ["", "selfSigned", "letsencrypt", "letsencrypt-staging"] },
-                "email": { "type": "string" }
+                "issuer": {
+                  "type": "string",
+                  "enum": [
+                    "",
+                    "selfSigned",
+                    "letsencrypt",
+                    "letsencrypt-staging"
+                  ]
+                },
+                "email": {
+                  "type": "string"
+                }
               }
             },
-            "certManagerClusterIssuer": { "type": "string" }
+            "certManagerClusterIssuer": {
+              "type": "string"
+            }
           }
         }
       },
-      "required": ["namespace"]
+      "required": [
+        "namespace"
+      ]
     },
     "storage": {
       "type": "object",
       "properties": {
-        "storageClassName": { "type": "string", "minLength": 1 }
+        "storageClassName": {
+          "type": "string"
+        },
+        "accessMode": {
+          "enum": [
+            "ReadWriteOnce",
+            "ReadWriteMany",
+            "ReadOnlyMany",
+            "ReadWriteOncePod"
+          ]
+        },
+        "claims": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "storageClassName": {
+                "type": "string"
+              },
+              "accessMode": {
+                "enum": [
+                  "ReadWriteOnce",
+                  "ReadWriteMany",
+                  "ReadOnlyMany",
+                  "ReadWriteOncePod"
+                ]
+              },
+              "size": {
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
       },
-      "required": ["storageClassName"]
+      "required": [
+        "storageClassName"
+      ]
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "properties": {
+        "fsGroup": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fsGroupChangePolicy": {
+          "enum": [
+            "OnRootMismatch",
+            "Always"
+          ]
+        },
+        "runAsUser": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runAsNonRoot": {
+          "type": "boolean"
+        },
+        "supplementalGroups": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
     },
     "extraEnv": {
       "type": "object",
-      "additionalProperties": { "type": ["string", "number", "boolean"] }
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
     },
     "secrets": {
       "type": "object",
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["externalSecrets", "csi", "manual"]
+          "enum": [
+            "externalSecrets",
+            "csi",
+            "manual"
+          ]
         },
         "externalSecrets": {
           "type": "object",
           "properties": {
-            "refreshInterval": { "type": "string" },
+            "refreshInterval": {
+              "type": "string"
+            },
             "secretStoreRef": {
               "type": "object",
               "properties": {
-                "kind": { "type": "string" },
-                "name": { "type": "string" }
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
               },
-              "required": ["kind", "name"]
+              "required": [
+                "kind",
+                "name"
+              ]
             },
             "application": {
               "type": "object",
               "properties": {
-                "targetSecretName": { "type": "string" },
-                "remoteKey": { "type": "string" }
+                "targetSecretName": {
+                  "type": "string"
+                },
+                "remoteKey": {
+                  "type": "string"
+                }
               },
-              "required": ["targetSecretName", "remoteKey"]
+              "required": [
+                "targetSecretName",
+                "remoteKey"
+              ]
             },
             "shared": {
               "type": "object",
               "properties": {
-                "targetSecretName": { "type": "string" },
-                "remoteKey": { "type": "string" }
+                "targetSecretName": {
+                  "type": "string"
+                },
+                "remoteKey": {
+                  "type": "string"
+                }
               },
-              "required": ["targetSecretName", "remoteKey"]
+              "required": [
+                "targetSecretName",
+                "remoteKey"
+              ]
             },
             "registryCredentials": {
               "type": "object",
               "properties": {
-                "enabled": { "type": "boolean" },
-                "targetSecretName": { "type": "string" },
-                "remoteKey": { "type": "string" }
+                "enabled": {
+                  "type": "boolean"
+                },
+                "targetSecretName": {
+                  "type": "string"
+                },
+                "remoteKey": {
+                  "type": "string"
+                }
               },
-              "required": ["enabled"]
+              "required": [
+                "enabled"
+              ]
             },
             "tls": {
               "type": "object",
               "properties": {
-                "enabled": { "type": "boolean" },
-                "targetSecretName": { "type": "string" },
-                "remoteKey": { "type": "string" }
+                "enabled": {
+                  "type": "boolean"
+                },
+                "targetSecretName": {
+                  "type": "string"
+                },
+                "remoteKey": {
+                  "type": "string"
+                }
               },
-              "required": ["enabled"]
+              "required": [
+                "enabled"
+              ]
             }
           },
-          "required": ["refreshInterval", "secretStoreRef", "application", "shared"]
+          "required": [
+            "refreshInterval",
+            "secretStoreRef",
+            "application",
+            "shared"
+          ]
         },
         "csi": {
           "type": "object",
@@ -114,30 +266,50 @@
             "secretProviderClass": {
               "type": "object",
               "properties": {
-                "enabled": { "type": "boolean" },
-                "name": { "type": "string" },
-                "provider": { "type": "string" },
-                "parameters": { "type": "object" },
-                "secretObjects": { "type": "array" }
+                "enabled": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object"
+                },
+                "secretObjects": {
+                  "type": "array"
+                }
               },
-              "required": ["enabled", "name", "provider"]
+              "required": [
+                "enabled",
+                "name",
+                "provider"
+              ]
             }
           }
         },
         "manual": {
           "type": "object",
           "properties": {
-            "createKubernetesSecrets": { "type": "boolean" },
+            "createKubernetesSecrets": {
+              "type": "boolean"
+            },
             "requiredKeys": {
               "type": "object",
               "properties": {
                 "application": {
                   "type": "array",
-                  "items": { "type": "string" }
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 "shared": {
                   "type": "array",
-                  "items": { "type": "string" }
+                  "items": {
+                    "type": "string"
+                  }
                 }
               }
             },
@@ -147,46 +319,72 @@
                 "application": {
                   "type": "object",
                   "properties": {
-                    "name": { "type": "string" },
+                    "name": {
+                      "type": "string"
+                    },
                     "stringData": {
                       "type": "object",
-                      "additionalProperties": { "type": "string" }
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     },
                     "data": {
                       "type": "object",
-                      "additionalProperties": { "type": "string" }
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     }
                   }
                 },
                 "shared": {
                   "type": "object",
                   "properties": {
-                    "name": { "type": "string" },
+                    "name": {
+                      "type": "string"
+                    },
                     "stringData": {
                       "type": "object",
-                      "additionalProperties": { "type": "string" }
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     },
                     "data": {
                       "type": "object",
-                      "additionalProperties": { "type": "string" }
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     }
                   }
                 },
                 "registryCredentials": {
                   "type": "object",
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "name": { "type": "string" },
-                    "dockerconfigjson": { "type": "string" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "dockerconfigjson": {
+                      "type": "string"
+                    }
                   }
                 },
                 "tls": {
                   "type": "object",
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "name": { "type": "string" },
-                    "crt": { "type": "string" },
-                    "key": { "type": "string" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "crt": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
                   }
                 },
                 "additional": {
@@ -194,18 +392,28 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "name": { "type": "string" },
-                      "type": { "type": "string" },
+                      "name": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
                       "stringData": {
                         "type": "object",
-                        "additionalProperties": { "type": "string" }
+                        "additionalProperties": {
+                          "type": "string"
+                        }
                       },
                       "data": {
                         "type": "object",
-                        "additionalProperties": { "type": "string" }
+                        "additionalProperties": {
+                          "type": "string"
+                        }
                       }
                     },
-                    "required": ["name"]
+                    "required": [
+                      "name"
+                    ]
                   }
                 }
               }
@@ -213,7 +421,9 @@
           }
         }
       },
-      "required": ["mode"]
+      "required": [
+        "mode"
+      ]
     },
     "images": {
       "type": "object",
@@ -231,57 +441,123 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "registry": { "type": "string" },
-          "repository": { "type": "string", "minLength": 1 },
-          "tag": { "type": "string", "minLength": 1 }
+          "registry": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["repository", "tag"]
+        "required": [
+          "repository",
+          "tag"
+        ]
       }
     },
     "replicaCounts": {
       "type": "object",
       "properties": {
-        "plextracapi": { "type": "integer", "minimum": 0 },
-        "ckeditor": { "type": "integer", "minimum": 0 },
-        "eventOrchestrator": { "type": "integer", "minimum": 0 },
-        "notificationEngine": { "type": "integer", "minimum": 0 },
-        "notificationSender": { "type": "integer", "minimum": 0 },
-        "integrationWorker": { "type": "integer", "minimum": 0 },
-        "contextualScoringService": { "type": "integer", "minimum": 0 },
-        "datalakeMaintainer": { "type": "integer", "minimum": 0 }
+        "plextracapi": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ckeditor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eventOrchestrator": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notificationEngine": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notificationSender": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "integrationWorker": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contextualScoringService": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "datalakeMaintainer": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "synqly": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "organizationID": { "type": "string" },
-        "organizationFullName": { "type": "string" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "organizationID": {
+          "type": "string"
+        },
+        "organizationFullName": {
+          "type": "string"
+        },
         "imagePullSecrets": {
           "type": "array",
           "items": {
             "type": "object",
-            "properties": { "name": { "type": "string" } },
-            "required": ["name"]
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
           }
         },
-        "replicas": { "type": "integer", "minimum": 0 },
-        "resources": { "type": "object" },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resources": {
+          "type": "object"
+        },
         "admin": {
           "type": "object",
           "properties": {
-            "username": { "type": "string" },
-            "password": { "type": "string" }
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
           }
         },
         "database": {
           "type": "object",
           "properties": {
-            "dedicated": { "type": "boolean" },
-            "name": { "type": "string" },
-            "host": { "type": "string" },
-            "port": { "type": "integer" },
-            "storage": { "type": "string" }
+            "dedicated": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "storage": {
+              "type": "string"
+            }
           }
         }
       }
@@ -289,43 +565,88 @@
     "keycloak": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "host": { "type": "string" },
-        "replicas": { "type": "integer", "minimum": 0 },
+        "enabled": {
+          "type": "boolean"
+        },
+        "host": {
+          "type": "string"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0
+        },
         "admin": {
           "type": "object",
           "properties": {
-            "username": { "type": "string" },
-            "password": { "type": "string" }
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
           }
         },
-        "tlsSecretName": { "type": "string" },
+        "tlsSecretName": {
+          "type": "string"
+        },
         "certManager": {
           "type": "object",
           "properties": {
-            "issuer": { "type": "string", "enum": ["", "selfSigned", "letsencrypt", "letsencrypt-staging"] },
-            "email": { "type": "string" }
+            "issuer": {
+              "type": "string",
+              "enum": [
+                "",
+                "selfSigned",
+                "letsencrypt",
+                "letsencrypt-staging"
+              ]
+            },
+            "email": {
+              "type": "string"
+            }
           }
         },
-        "certManagerClusterIssuer": { "type": "string" },
-        "resources": { "type": "object" },
+        "certManagerClusterIssuer": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object"
+        },
         "imagePullSecrets": {
           "type": "array",
           "items": {
             "type": "object",
-            "properties": { "name": { "type": "string" } },
-            "required": ["name"]
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
           }
         },
         "database": {
           "type": "object",
           "properties": {
-            "dedicated": { "type": "boolean" },
-            "name": { "type": "string" },
-            "user": { "type": "string" },
-            "host": { "type": "string" },
-            "port": { "type": "integer" },
-            "storage": { "type": "string" }
+            "dedicated": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "storage": {
+              "type": "string"
+            }
           }
         }
       }
@@ -333,27 +654,50 @@
     "mcp": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "replicas": { "type": "integer", "minimum": 0 },
-        "blockMetricsPath": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blockMetricsPath": {
+          "type": "boolean"
+        },
         "otel": {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean" },
-            "exporterEndpoint": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "exporterEndpoint": {
+              "type": "string"
+            }
           }
         },
-        "resources": { "type": "object" },
+        "resources": {
+          "type": "object"
+        },
         "imagePullSecrets": {
           "type": "array",
           "items": {
             "type": "object",
-            "properties": { "name": { "type": "string" } },
-            "required": ["name"]
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
           }
         }
       }
     }
   },
-  "required": ["global", "secrets", "images"]
+  "required": [
+    "global",
+    "secrets",
+    "images"
+  ]
 }

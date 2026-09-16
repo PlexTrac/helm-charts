@@ -22,6 +22,35 @@
 #     # Used only when certManager.issuer is "" — bring your own issuer:
 #     certManagerClusterIssuer: ""
 
+# storage:
+#   # Default StorageClass for every claim.
+#   #   K3s: local-path   GKE: premium-rwo   EKS: gp3   AKS: managed-premium
+#   storageClassName: local-path
+#   accessMode: ReadWriteOnce
+#
+#   # Per-claim overrides. On a MULTI-NODE cluster plextracapi-pvc and
+#   # whitelabeling-pvc are each mounted by more than one pod and need
+#   # ReadWriteMany on a shared filesystem. The database claims must stay on
+#   # block storage. Ready-made overlays:
+#   #   examples/values-eks-efs.yaml        (EFS)
+#   #   examples/values-gke-filestore.yaml  (Filestore)
+#   claims:
+#     plextracapi:
+#       accessMode: ReadWriteMany
+#       storageClassName: efs-plextrac
+#       # size: 100Gi        # only needed when the backend has a size floor (e.g. Filestore)
+#     whitelabeling:
+#       accessMode: ReadWriteMany
+#       storageClassName: efs-plextrac
+
+# Pod securityContext for the four workloads that mount the shared claims. The app
+# image runs as uid/gid 1337; without an fsGroup it cannot write to a freshly
+# provisioned block volume or NFS export. Not needed on K3s (local-path creates
+# world-writable directories); required on EFS, Filestore, Azure Files and NFS.
+# podSecurityContext:
+#   fsGroup: 1337
+#   fsGroupChangePolicy: OnRootMismatch
+
 # secrets:
 #   # Choose one: externalSecrets | csi | manual
 #   mode: externalSecrets

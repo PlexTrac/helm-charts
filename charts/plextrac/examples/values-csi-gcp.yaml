@@ -15,6 +15,35 @@ global:
       email: ""      # required for letsencrypt / letsencrypt-staging
     certManagerClusterIssuer: ""   # used only when certManager.issuer is ""
 
+storage:
+  # GKE Persistent Disk. Use standard-rwo for HDD.
+  storageClassName: premium-rwo
+  accessMode: ReadWriteOnce
+
+  # Per-claim overrides. plextracapi and whitelabeling are the only claims mounted by
+  # more than one pod, so on a MULTI-NODE cluster they need ReadWriteMany on a shared
+  # filesystem. The database claims must stay on block storage. Single-node clusters
+  # need nothing here.
+  #
+  # Rather than hand-editing this, add the matching overlay as a second -f:
+  #   -f examples/values-gke-filestore.yaml
+  # claims:
+  #   plextracapi:
+  #     accessMode: ReadWriteMany
+  #     storageClassName: filestore-plextrac
+  #   whitelabeling:
+  #     accessMode: ReadWriteMany
+  #     storageClassName: filestore-plextrac
+
+# Required on cloud block storage. The app image runs as uid/gid 1337, and a freshly
+# provisioned Persistent Disk volume arrives owned by root, so the four workloads that mount the
+# shared claims (plextracapi, event-orchestrator, integration-worker, migrations-and-etl)
+# could not write to it. Harmless to leave set on any backend. Verify after install:
+#   kubectl -n plextrac exec deploy/plextracapi -- touch /usr/src/plextrac-api/uploads/.probe
+podSecurityContext:
+  fsGroup: 1337
+  fsGroupChangePolicy: OnRootMismatch
+
 secrets:
   mode: csi
   csi:
