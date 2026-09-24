@@ -26,7 +26,7 @@ Split into what the PlexTrac chart itself needs and what the cluster prerequisit
 | `docker.cke-cs.com` | `cs` (CKEditor collaboration server) | required | **CKEditor login**<br>`ckeditor-registry-creds` |
 | `docker.io` | `plextrac/plextrac-keycloak` | `keycloak.enabled` | Same Docker Hub login |
 | `docker.io` | `plextrac/mcp` | `mcp.enabled` | Same Docker Hub login |
-| `quay.io` | `synqly/embedded` | `synqly.enabled` | **Separate quay.io login**<br>Requires its own quay.io pull secret. |
+| `quay.io` | `synqly/embedded` | `synqly.enabled` | **Quay.io login**<br>Requires its own quay.io pull secret. |
 | `docker.io` | `oliver006/redis_exporter:latest` | `redis.metrics.enabled` | Public |
 
 ### Cluster prerequisites
