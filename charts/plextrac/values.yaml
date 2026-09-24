@@ -195,7 +195,7 @@ images:
   redis:
     repository: redis
     tag: 8.4.0-alpine
-  redisExporter:
+  redisExporter:   # only used when redis.metrics.enabled
     repository: oliver006/redis_exporter
     tag: latest
   minio:
@@ -320,7 +320,7 @@ resources:
     requests:
       cpu: 30m
       memory: 256Mi
-  redisExporter:
+  redisExporter:   # only used when redis.metrics.enabled
     limits:
       cpu: 200m
       memory: 512Mi
@@ -398,6 +398,15 @@ keycloak:
     host: ""                        # defaults to "postgres" (bundled) or "keycloak-postgres" (dedicated)
     port: 5432
     storage: 8Gi
+
+# Optional Prometheus metrics for Redis, disabled by default. When enabled, a redis_exporter
+# sidecar runs in the redis pod and serves metrics on port 9121, with prometheus.io/scrape and
+# prometheus.io/port pod annotations. Nothing in this chart scrapes it; bring your own Prometheus.
+# Toggling this changes the redis pod template, so redis restarts once on that upgrade.
+# image -> images.redisExporter; resources -> resources.redisExporter
+redis:
+  metrics:
+    enabled: false
 
 # Optional in-cluster MCP (Model Context Protocol) server, disabled by default.
 # REQUIRES keycloak.enabled (it authenticates via Keycloak). Served as a path (/mcp) on the

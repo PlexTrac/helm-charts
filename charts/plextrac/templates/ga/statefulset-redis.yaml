@@ -20,9 +20,11 @@ spec:
   serviceName: redis
   template:
     metadata:
+      {{- if .Values.redis.metrics.enabled }}
       annotations:
-        prometheus.io/metricsPortNumber: "9121"
+        prometheus.io/port: "9121"
         prometheus.io/scrape: "true"
+      {{- end }}
       labels:
         app: redis
         app.kubernetes.io/component: database
@@ -35,6 +37,7 @@ spec:
     spec:
       {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       containers:
+      {{- if .Values.redis.metrics.enabled }}
       - env:
         - name: REDIS_PASSWORD
           valueFrom:
@@ -55,6 +58,7 @@ spec:
             - ALL
           runAsGroup: 59000
           runAsUser: 59000
+      {{- end }}
       - args:
         - --requirepass
         - $(REDIS_PASSWORD)

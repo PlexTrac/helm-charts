@@ -224,7 +224,6 @@
         "ckeditor",
         "postgres",
         "redis",
-        "redisExporter",
         "minioBootstrap",
         "minio"
       ],
@@ -326,6 +325,17 @@
             "host": { "type": "string" },
             "port": { "type": "integer" },
             "storage": { "type": "string" }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
           }
         }
       }

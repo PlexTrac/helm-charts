@@ -134,6 +134,12 @@
 #   database:
 #     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
 
+# Optional Prometheus metrics for Redis (disabled by default). Adds a redis_exporter sidecar on
+# port 9121 with prometheus.io/scrape + prometheus.io/port annotations. Bring your own Prometheus.
+# redis:
+#   metrics:
+#     enabled: true
+
 # Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
 # REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
 # mcp:
