@@ -3,6 +3,9 @@ kind: Ingress
 metadata:
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
+{{- with .Values.global.ingress.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ . | quote }}
+{{- end }}
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"

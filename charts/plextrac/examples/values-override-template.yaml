@@ -21,6 +21,8 @@
 #       email: ""                    # required for letsencrypt / letsencrypt-staging
 #     # Used only when certManager.issuer is "" — bring your own issuer:
 #     certManagerClusterIssuer: ""
+#     # Max request body (upload) size on every Ingress. "0" = no limit, "" = controller default (1m).
+#     proxyBodySize: 100m
 
 # secrets:
 #   # Choose one: externalSecrets | csi | manual

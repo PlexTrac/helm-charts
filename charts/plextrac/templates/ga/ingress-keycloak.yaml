@@ -14,6 +14,9 @@ metadata:
     cert-manager.io/cluster-issuer: {{ .Values.keycloak.certManagerClusterIssuer | quote }}
 {{- end }}
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
+{{- with .Values.global.ingress.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ . | quote }}
+{{- end }}
 spec:
   ingressClassName: nginx
   rules:

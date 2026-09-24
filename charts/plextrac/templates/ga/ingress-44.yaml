@@ -3,6 +3,9 @@ kind: Ingress
 metadata:
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
+{{- with .Values.global.ingress.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ . | quote }}
+{{- end }}
     nginx.ingress.kubernetes.io/proxy-buffer-size: 64k
     nginx.ingress.kubernetes.io/proxy-buffering: "on"
     nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
