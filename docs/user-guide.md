@@ -1149,6 +1149,18 @@ nslookup plextrac.mycompany.com
 kubectl -n ingress-nginx logs -l app.kubernetes.io/name=ingress-nginx --tail=100
 ```
 
+### Uploads fail with `413 Request Entity Too Large`
+
+The request body is larger than the ingress allows. Every Ingress the chart creates sets `nginx.ingress.kubernetes.io/proxy-body-size` from `global.ingress.proxyBodySize` (default `100m`). Raise it in `my-values.yaml` and run `helm upgrade` with that file:
+
+```yaml
+global:
+  ingress:
+    proxyBodySize: 500m   # number + optional k/m/g suffix; "0" = no limit; "" = controller default (1m)
+```
+
+No pod restarts are needed; ingress-nginx reloads when the Ingresses change. If a 413 persists after raising it, the limit is enforced somewhere else in the request path (a load balancer, WAF or proxy in front of the cluster, or the application itself).
+
 ### PlexTrac API returns 502 Bad Gateway
 
 nginx is up but cannot reach `plextracapi`. The API readiness probe is at `/api/v2/health/full` and fails if Couchbase, Redis, or Postgres are not ready, or if the `migrations-and-etl` Job has not yet migrated the database:

@@ -10,6 +10,9 @@ metadata:
 {{- end }}
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
     nginx.ingress.kubernetes.io/enable-gzip: "true"
+{{- with .Values.global.ingress.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ . | quote }}
+{{- end }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
   labels:
     app.kubernetes.io/version: 2.23.4

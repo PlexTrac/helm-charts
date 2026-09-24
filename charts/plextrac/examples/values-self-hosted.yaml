@@ -21,6 +21,7 @@ global:
       issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
       email: ""      # required for letsencrypt / letsencrypt-staging
     certManagerClusterIssuer: ""   # used only when certManager.issuer is "" (your own issuer's name)
+    proxyBodySize: 100m   # max upload size on every Ingress; "0" = no limit, "" = controller default (1m)
 
 secrets:
   mode: manual

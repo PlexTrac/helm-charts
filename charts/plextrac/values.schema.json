@@ -35,7 +35,8 @@
                 "email": { "type": "string" }
               }
             },
-            "certManagerClusterIssuer": { "type": "string" }
+            "certManagerClusterIssuer": { "type": "string" },
+            "proxyBodySize": { "type": "string", "pattern": "^([0-9]+[kKmMgG]?)?$" }
           }
         }
       },

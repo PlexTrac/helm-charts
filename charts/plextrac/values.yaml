@@ -21,6 +21,11 @@ global:
       email: ""   # required when issuer is "letsencrypt" or "letsencrypt-staging"
     # Used only when certManager.issuer is "" — name of an Issuer/ClusterIssuer you created yourself.
     certManagerClusterIssuer: ""
+    # Max client request body (upload) size on every Ingress, set via the ingress-nginx
+    # nginx.ingress.kubernetes.io/proxy-body-size annotation. Larger requests get HTTP 413.
+    # A number with an optional k/m/g suffix (512k, 100m, 1g). "0" (quoted) removes the limit.
+    # "" omits the annotation so the controller's default applies (1m unless set in its ConfigMap).
+    proxyBodySize: 100m
 
 storage:
   storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
