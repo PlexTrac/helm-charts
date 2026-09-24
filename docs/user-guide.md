@@ -60,10 +60,11 @@ Read through this checklist before touching any `helm` command. Installing the c
 | keycloak-postgres | Deployment | `keycloak.enabled` **and** `keycloak.database.dedicated` |
 | keycloak-realm-setup | Job | `keycloak.enabled` |
 | mcp | Deployment | `mcp.enabled` (requires `keycloak.enabled`) |
+| redis-exporter | Sidecar in the `redis` pod | `redis.metrics.enabled` (Prometheus metrics on port 9121; you supply the Prometheus) |
 
 > The dedicated-Postgres deployments (`synqly-postgres`, `keycloak-postgres`) appear only when you set the respective `database.dedicated: true`; otherwise those components share the bundled `postgres`. `keycloak-realm-setup` is a revision-keyed Job that re-runs (idempotently) on every upgrade to provision the Keycloak realm. The resource estimate below covers the core stack only — enabling these adds to it. See the reference sections for [Synqly](#reference-synqly-optional), [Keycloak](#reference-keycloak-optional), and [MCP](#reference-mcp-optional).
 
-**Minimum cluster resources:** ~1.6 CPU cores and ~4.3 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
+**Minimum cluster resources:** ~1.1 CPU cores and ~4.6 GiB RAM in requests at default replica counts; ~41 GiB persistent storage.
 
 ### Software requirements
 

@@ -75,7 +75,7 @@ Edit `.env.local` and set the following required variables:
 - `DOCKER_REGISTRY`: (Default value will be pulled from my-values.yaml file)
 - `DOCKER_USERNAME`: ptcustomers (#DOCKER_HUB_USER)
 - `DOCKER_PASSWORD`: (#DOCKER_HUB_KEY)
-- `CKEDITOR_DOCKER_SERVER`: docker.cke.cs.com (#IMAGE_REGISTRY)
+- `CKEDITOR_DOCKER_SERVER`: docker.cke-cs.com (#IMAGE_REGISTRY)
 - `CKEDITOR_DOCKER_USERNAME`: cs (#IMAGE_REGISTRY_USER)
 - `CKEDITOR_DOCKER_PASSWORD`: (#IMAGE_REGISTRY_PASS)
 
@@ -108,10 +108,10 @@ global:
   # Run scripts/setup-registry-credentials.sh to create the image pull secret, then
   # reference it here. Leave empty only if all images are from public registries.
   imagePullSecrets:
-    - name: plextrac-registry-creds
+    - name: internal-registry-creds
     - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
-  image:
-      registry: "registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro"   # set to your registry/mirror to re-home all images except ckeditor
+  # image:
+  #   registry: ""   # set to your registry/mirror to re-home all images except ckeditor
   ingress:
     host: plextrac.local   # Required: set to your actual domain
     tlsSecretName: plextrac-com-tls
@@ -153,8 +153,8 @@ images:
     repository: plextrac/plextracnginx
     tag: stable
   ckeditor:
-    registry: registry.dorf.plextrac.ninja
-    repository: ckeditor-registry-proxy/cs
+    registry: docker.cke-cs.com
+    repository: cs
     tag: latest
   plextracdb:
     repository: plextrac/plextracdb

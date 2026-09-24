@@ -1,0 +1,377 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PlexTrac Helm Topology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --ink:#18212B; --muted:#56616E; --line:#CBD2DA;
+  --accent:#0B7A83; --accent-soft:#E0F1F2; --opt:#A86A12; --opt-soft:#FBF1E1;
+  --frame:#EAEEF2;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#11161C; --surface:#18202A; --ink:#E4E9EE; --muted:#9AA6B2; --line:#34404D;
+    --accent:#45C0C9; --accent-soft:#12343A; --opt:#E3A548; --opt-soft:#3A2A12; --frame:#151C24;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#11161C; --surface:#18202A; --ink:#E4E9EE; --muted:#9AA6B2; --line:#34404D;
+  --accent:#45C0C9; --accent-soft:#12343A; --opt:#E3A548; --opt-soft:#3A2A12; --frame:#151C24;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:32px 64px;display:flex;flex-direction:column;gap:40px}
+header{display:flex;flex-direction:column;gap:8px;max-width:72ch}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:30px;line-height:1.2;font-weight:600;margin:0;text-wrap:balance}
+h2{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+h3{font-size:15px;font-weight:600;margin:0}
+p{margin:0}
+.lede{color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.9em}
+section{display:flex;flex-direction:column;gap:14px}
+figure{margin:0;display:flex;flex-direction:column;gap:10px}
+.diagram{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px}
+.diagram svg{display:block;width:100%;min-width:900px;height:auto;color:var(--ink)}
+figcaption{color:var(--muted);font-size:14px;max-width:80ch}
+.key{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:8px}
+.sw{width:22px;height:12px;border-radius:2px;border:1.5px solid var(--line);background:var(--surface)}
+.sw.opt{border:1.5px dashed var(--opt);background:var(--opt-soft)}
+.sw.route{border:0;height:2px;background:var(--accent)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--frame)}
+tr:last-child td{border-bottom:0}
+td.reg{font-family:var(--mono);font-size:13px;white-space:nowrap}
+td ul{margin:0;padding-left:18px}
+.pill{display:inline-block;font-size:11px;font-family:var(--mono);padding:1px 7px;border-radius:999px;white-space:nowrap}
+.pill.req{background:var(--accent-soft);color:var(--accent)}
+.pill.opt{background:var(--opt-soft);color:var(--opt)}
+.pill.cred{border:1px solid var(--line);color:var(--ink)}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.note{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.note p{color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">charts/plextrac · chart 2.28.0</span>
+    <h1>PlexTrac on Kubernetes</h1>
+    <p class="lede">What the Helm chart runs, how traffic reaches it, and every container registry a cluster needs to pull from. Built from <code>helm template</code> output with all optional components turned on, so the optional pieces show up too.</p>
+  </header>
+
+  <section>
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 1200 830" role="img" aria-label="Browser traffic enters the ingress-nginx controller, which routes by path to plextracnginx, plextracapi, ckeditor-backend, mcp, and by host to keycloak. All application pods and background workers reach Couchbase, Postgres, Redis and MinIO through in-cluster Services. Each data store has its own persistent volume." font-family="IBM Plex Sans, system-ui, sans-serif">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+            <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+          </defs>
+
+          <!-- users + ingress -->
+          <rect x="500" y="14" width="200" height="40" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+          <text x="600" y="39" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">Browser · HTTPS 443</text>
+          <line x1="600" y1="54" x2="600" y2="84" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrA)"/>
+
+          <rect x="100" y="86" width="1000" height="54" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="600" y="108" text-anchor="middle" font-size="13" font-weight="600" fill="currentColor">ingress-nginx controller  (namespace ingress-nginx, installed separately)</text>
+          <text x="600" y="127" text-anchor="middle" font-size="11.5" fill="var(--muted)">terminates TLS: cert-manager Issuer, pre-created secret, or ESO-synced secret · routes by path on the app host</text>
+
+          <!-- namespace frame -->
+          <rect x="20" y="164" width="1160" height="654" rx="6" fill="var(--frame)" stroke="var(--line)" stroke-dasharray="6 4"/>
+          <text x="36" y="184" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--muted)">namespace: plextrac</text>
+
+          <!-- ingress routes -->
+          <g stroke="var(--accent)" stroke-width="1.6" fill="none">
+            <line x1="150" y1="140" x2="150" y2="238" marker-end="url(#arrA)"/>
+            <line x1="372" y1="140" x2="372" y2="238" marker-end="url(#arrA)"/>
+            <line x1="594" y1="140" x2="594" y2="238" marker-end="url(#arrA)"/>
+            <line x1="816" y1="140" x2="816" y2="238" marker-end="url(#arrA)" stroke-dasharray="5 3"/>
+            <line x1="1038" y1="140" x2="1038" y2="238" marker-end="url(#arrA)" stroke-dasharray="5 3"/>
+          </g>
+          <g font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--accent)">
+            <text x="158" y="204">/</text>
+            <text x="380" y="204">/api/  /graphql</text>
+            <text x="602" y="204">/ws-v2</text>
+            <text x="824" y="204">/mcp</text>
+            <text x="1046" y="204">auth host</text>
+          </g>
+
+          <!-- app tier container -->
+          <rect x="38" y="222" width="1124" height="232" rx="5" fill="none" stroke="var(--line)"/>
+          <text x="1150" y="446" text-anchor="end" font-size="11" fill="var(--muted)">application tier</text>
+
+          <!-- row A -->
+          <g>
+            <rect x="50" y="240" width="200" height="72" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="62" y="262" font-size="13" font-weight="600" fill="currentColor">plextracnginx</text>
+            <text x="62" y="281" font-size="11.5" fill="var(--muted)">Deployment ×1 · web UI</text>
+            <text x="62" y="299" font-size="11.5" fill="var(--muted)">vol: nginx-config-pvc</text>
+
+            <rect x="272" y="240" width="200" height="72" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="284" y="262" font-size="13" font-weight="600" fill="currentColor">plextracapi</text>
+            <text x="284" y="281" font-size="11.5" fill="var(--muted)">Deployment ×3 · :4350</text>
+            <text x="284" y="299" font-size="11.5" fill="var(--muted)">vols: api data, whitelabeling</text>
+
+            <rect x="494" y="240" width="200" height="72" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="506" y="262" font-size="13" font-weight="600" fill="currentColor">ckeditor-backend</text>
+            <text x="506" y="281" font-size="11.5" fill="var(--muted)">Deployment ×3 · :8000</text>
+            <text x="506" y="299" font-size="11.5" fill="var(--muted)">image: docker.cke-cs.com/cs</text>
+
+            <rect x="716" y="240" width="200" height="72" rx="4" fill="var(--opt-soft)" stroke="var(--opt)" stroke-width="1.2" stroke-dasharray="5 3"/>
+            <text x="728" y="262" font-size="13" font-weight="600" fill="currentColor">mcp</text>
+            <text x="728" y="281" font-size="11.5" fill="var(--muted)">mcp.enabled · :8000</text>
+            <text x="728" y="299" font-size="11.5" fill="var(--muted)">calls plextracapi :4350</text>
+
+            <rect x="938" y="240" width="200" height="72" rx="4" fill="var(--opt-soft)" stroke="var(--opt)" stroke-width="1.2" stroke-dasharray="5 3"/>
+            <text x="950" y="262" font-size="13" font-weight="600" fill="currentColor">keycloak</text>
+            <text x="950" y="281" font-size="11.5" fill="var(--muted)">keycloak.enabled · :8080</text>
+            <text x="950" y="299" font-size="11.5" fill="var(--muted)">own host + TLS cert</text>
+          </g>
+
+          <!-- row B: workers -->
+          <rect x="50" y="332" width="866" height="108" rx="4" fill="none" stroke="currentColor" stroke-width="1" stroke-opacity=".45"/>
+          <text x="62" y="351" font-size="12" font-weight="600" fill="currentColor">Background workers <tspan font-weight="400" fill="var(--muted)">· all run the plextracapi image · no ingress</tspan></text>
+          <g font-size="11.5" fill="currentColor">
+            <rect x="62" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="72" y="384" font-weight="600">event-</text><text x="72" y="399" font-weight="600">orchestrator</text><text x="72" y="416" fill="var(--muted)">×1</text>
+            <rect x="204" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="214" y="384" font-weight="600">notification-</text><text x="214" y="399" font-weight="600">engine</text><text x="214" y="416" fill="var(--muted)">×1</text>
+            <rect x="346" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="356" y="384" font-weight="600">notification-</text><text x="356" y="399" font-weight="600">sender</text><text x="356" y="416" fill="var(--muted)">×1</text>
+            <rect x="488" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="498" y="384" font-weight="600">integration-</text><text x="498" y="399" font-weight="600">worker</text><text x="498" y="416" fill="var(--muted)">×1</text>
+            <rect x="630" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+            <text x="640" y="384" font-weight="600">contextual-</text><text x="640" y="399" font-weight="600">scoring-service</text><text x="640" y="416" fill="var(--muted)">×1</text>
+            <rect x="772" y="362" width="134" height="64" rx="3" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="3 3"/>
+            <text x="782" y="384" font-weight="600">datalake-</text><text x="782" y="399" font-weight="600">maintainer</text><text x="782" y="416" fill="var(--muted)">×0 (off by default)</text>
+          </g>
+
+          <rect x="938" y="346" width="200" height="80" rx="4" fill="var(--opt-soft)" stroke="var(--opt)" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="950" y="368" font-size="13" font-weight="600" fill="currentColor">synqly-embedded</text>
+          <text x="950" y="387" font-size="11.5" fill="var(--muted)">synqly.enabled · :8000</text>
+          <text x="950" y="405" font-size="11.5" fill="var(--muted)">internal only, called by API</text>
+          <text x="950" y="419" font-size="11.5" fill="var(--muted)">image: quay.io/synqly</text>
+
+          <!-- bus -->
+          <g stroke="currentColor" stroke-width="1.3">
+            <line x1="200" y1="454" x2="200" y2="486"/>
+            <line x1="600" y1="454" x2="600" y2="486"/>
+            <line x1="1000" y1="454" x2="1000" y2="486"/>
+            <line x1="150" y1="486" x2="1150" y2="486"/>
+          </g>
+          <text x="610" y="476" font-size="11.5" fill="var(--muted)">connects over ClusterIP Services (no ingress)</text>
+          <g stroke="currentColor" stroke-width="1.3" fill="none">
+            <line x1="150" y1="486" x2="150" y2="524" marker-end="url(#arr)"/>
+            <line x1="372" y1="486" x2="372" y2="524" marker-end="url(#arr)"/>
+            <line x1="594" y1="486" x2="594" y2="524" marker-end="url(#arr)"/>
+            <line x1="816" y1="486" x2="816" y2="524" marker-end="url(#arr)"/>
+            <line x1="1038" y1="486" x2="1038" y2="524" marker-end="url(#arr)" stroke-dasharray="5 3"/>
+          </g>
+
+          <!-- data tier -->
+          <g>
+            <rect x="50" y="526" width="200" height="92" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="62" y="548" font-size="13" font-weight="600" fill="currentColor">plextracdb</text>
+            <text x="62" y="567" font-size="11.5" fill="var(--muted)">Couchbase 7.2 · StatefulSet</text>
+            <text x="62" y="585" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--muted)">:8091-8094 :11210</text>
+            <text x="62" y="605" font-size="11.5" fill="var(--muted)">document store</text>
+
+            <rect x="272" y="526" width="200" height="92" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="284" y="548" font-size="13" font-weight="600" fill="currentColor">postgres</text>
+            <text x="284" y="567" font-size="11.5" fill="var(--muted)">Deployment ×1</text>
+            <text x="284" y="585" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--muted)">:5432</text>
+            <text x="284" y="605" font-size="11.5" fill="var(--muted)">core, ckeditor, runbooks DBs</text>
+
+            <rect x="494" y="526" width="200" height="92" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="506" y="548" font-size="13" font-weight="600" fill="currentColor">redis</text>
+            <text x="506" y="567" font-size="11.5" fill="var(--muted)">StatefulSet · 8.4 alpine</text>
+            <text x="506" y="585" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--muted)">:6379</text>
+            <text x="506" y="605" font-size="11.5" fill="var(--opt)">+ exporter sidecar :9121</text>
+
+            <rect x="716" y="526" width="200" height="92" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.2"/>
+            <text x="728" y="548" font-size="13" font-weight="600" fill="currentColor">minio</text>
+            <text x="728" y="567" font-size="11.5" fill="var(--muted)">Deployment ×1 · object store</text>
+            <text x="728" y="585" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--muted)">:9000 :9001</text>
+            <text x="728" y="605" font-size="11.5" fill="var(--accent)">ingress: /cloud/uploads/</text>
+
+            <rect x="938" y="526" width="200" height="92" rx="4" fill="var(--opt-soft)" stroke="var(--opt)" stroke-width="1.2" stroke-dasharray="5 3"/>
+            <text x="950" y="548" font-size="13" font-weight="600" fill="currentColor">keycloak-postgres</text>
+            <text x="950" y="567" font-size="13" font-weight="600" fill="currentColor">synqly-postgres</text>
+            <text x="950" y="585" font-size="11.5" fill="var(--muted)">only with database.dedicated</text>
+            <text x="950" y="605" font-size="11.5" fill="var(--muted)">else they share postgres</text>
+          </g>
+
+          <!-- PVCs -->
+          <g font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--muted)">
+            <rect x="50" y="628" width="200" height="24" rx="12" fill="none" stroke="var(--line)"/><text x="150" y="644" text-anchor="middle">plextracdb-pvc 15Gi</text>
+            <rect x="272" y="628" width="200" height="24" rx="12" fill="none" stroke="var(--line)"/><text x="372" y="644" text-anchor="middle">postgres-pvc 15Gi</text>
+            <rect x="494" y="628" width="200" height="24" rx="12" fill="none" stroke="var(--line)"/><text x="594" y="644" text-anchor="middle">redis-pvc 1Gi</text>
+            <rect x="716" y="628" width="200" height="24" rx="12" fill="none" stroke="var(--line)"/><text x="816" y="644" text-anchor="middle">minio-pvc 5Gi</text>
+            <rect x="938" y="628" width="200" height="24" rx="12" fill="none" stroke="var(--opt)" stroke-dasharray="4 3"/><text x="1038" y="644" text-anchor="middle">8Gi each</text>
+          </g>
+
+          <!-- bottom: jobs / shared volumes / config -->
+          <rect x="50" y="676" width="420" height="126" rx="4" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+          <text x="62" y="696" font-size="12" font-weight="600" fill="currentColor">Jobs</text>
+          <g font-size="11.5" fill="var(--muted)">
+            <text x="62" y="718"><tspan font-weight="600" fill="currentColor">migrations-and-etl-N</tspan>  every release revision, waits for postgres</text>
+            <text x="62" y="740"><tspan font-weight="600" fill="currentColor">bootstrap-minio</tspan>  post-install / post-upgrade hook</text>
+            <text x="62" y="762"><tspan font-weight="600" fill="var(--opt)">keycloak-realm-setup-N</tspan>  keycloak.enabled, idempotent</text>
+            <text x="62" y="786">plextracapi stays not-Ready until migrations finish</text>
+          </g>
+
+          <rect x="490" y="676" width="330" height="126" rx="4" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+          <text x="502" y="696" font-size="12" font-weight="600" fill="currentColor">Shared volumes</text>
+          <g font-size="11.5" fill="var(--muted)">
+            <text x="502" y="718"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">plextracapi-pvc 5Gi</tspan></text>
+            <text x="502" y="735">api, ckeditor, event-orch, integration,</text>
+            <text x="502" y="751">migrations</text>
+            <text x="502" y="773"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">nginx-config-pvc 50Mi</tspan>  nginx</text>
+            <text x="502" y="792"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">whitelabeling-pvc 1Mi</tspan>  api</text>
+          </g>
+
+          <rect x="840" y="676" width="310" height="126" rx="4" fill="none" stroke="currentColor" stroke-opacity=".45"/>
+          <text x="852" y="696" font-size="12" font-weight="600" fill="currentColor">Config and secrets</text>
+          <g font-size="11.5" fill="var(--muted)">
+            <text x="852" y="718"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">env-config</tspan>  ConfigMap, all app pods</text>
+            <text x="852" y="738"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">application-secrets</tspan></text>
+            <text x="852" y="756"><tspan font-family="IBM Plex Mono, monospace" fill="currentColor">shared-secrets</tspan></text>
+            <text x="852" y="776">source: generated (manual), ESO,</text>
+            <text x="852" y="792">or CSI Secrets Store</text>
+          </g>
+        </svg>
+      </div>
+      <div class="key">
+        <span><i class="sw route"></i>ingress route (path or host)</span>
+        <span><i class="sw"></i>always deployed</span>
+        <span><i class="sw opt"></i>optional, off by default (flag shown in the box)</span>
+      </div>
+      <figcaption>Everything outside the ingress path is internal. The browser only ever talks to ingress-nginx, which sends <code>/</code> to the web UI, <code>/api/</code> and <code>/graphql</code> straight to plextracapi, <code>/ws-v2</code> to CKEditor, and <code>/cloud/uploads/</code> to MinIO. The API, CKEditor and the workers reach the data stores by Service name (<code>plextracdb</code>, <code>postgres</code>, <code>redis</code>, <code>minio</code>). Replica counts are chart defaults.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Registries the cluster pulls from</h2>
+    <p class="lede" style="max-width:80ch">Split into what the PlexTrac chart itself needs and what the cluster prerequisites need. Setting <code>global.image.registry</code> re-homes every chart image to a mirror except CKEditor and Synqly, which set their own registry and have to be overridden one by one.</p>
+
+    <h3>PlexTrac chart images</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Registry</th><th>Images</th><th>When</th><th>Pull credentials</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><ul>
+              <li><code>plextrac/plextracapi</code> (API, workers, jobs)</li>
+              <li><code>plextrac/plextracnginx</code></li>
+              <li><code>plextrac/plextracdb</code></li>
+              <li><code>plextrac/plextracpostgres</code></li>
+              <li><code>plextrac/minio</code>, <code>plextrac/plextrac-minio-bootstrap</code></li>
+            </ul></td>
+            <td><span class="pill req">required</span></td>
+            <td><span class="pill cred">PlexTrac-issued Docker Hub login</span><br><code>internal-registry-creds</code></td>
+          </tr>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><code>redis:8.4.0-alpine</code> (official image)</td>
+            <td><span class="pill req">required</span></td>
+            <td>Public</td>
+          </tr>
+          <tr>
+            <td class="reg">docker.cke-cs.com</td>
+            <td><code>cs</code> (CKEditor collaboration server)</td>
+            <td><span class="pill req">required</span></td>
+            <td><span class="pill cred">CKEditor login</span><br><code>ckeditor-registry-creds</code></td>
+          </tr>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><code>plextrac/plextrac-keycloak</code></td>
+            <td><span class="pill opt">keycloak.enabled</span></td>
+            <td>Same Docker Hub login</td>
+          </tr>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><code>plextrac/mcp</code></td>
+            <td><span class="pill opt">mcp.enabled</span></td>
+            <td>Same Docker Hub login</td>
+          </tr>
+          <tr>
+            <td class="reg">quay.io</td>
+            <td><code>synqly/embedded</code></td>
+            <td><span class="pill opt">synqly.enabled</span></td>
+            <td><span class="pill cred">Separate quay.io login</span><br>Requires its own quay.io pull secret.</td>
+          </tr>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><code>oliver006/redis_exporter:latest</code></td>
+            <td><span class="pill opt">redis.metrics.enabled</span></td>
+            <td>Public</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Cluster prerequisites</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Registry</th><th>Images</th><th>When</th><th>Pull credentials</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="reg">registry.k8s.io</td>
+            <td><code>ingress-nginx/controller</code>, <code>ingress-nginx/kube-webhook-certgen</code></td>
+            <td><span class="pill req">required</span></td>
+            <td>Public</td>
+          </tr>
+          <tr>
+            <td class="reg">docker.io</td>
+            <td><code>rancher/*</code>: klipper-lb, local-path-provisioner, mirrored-coredns-coredns, mirrored-metrics-server, mirrored-pause, klipper-helm, mirrored-library-busybox</td>
+            <td><span class="pill req">K3s installs</span></td>
+            <td>Public</td>
+          </tr>
+          <tr>
+            <td class="reg">quay.io</td>
+            <td><code>jetstack/cert-manager-controller</code>, <code>-webhook</code>, <code>-cainjector</code>, <code>-startupapicheck</code></td>
+            <td><span class="pill opt">cert-manager TLS</span></td>
+            <td>Public</td>
+          </tr>
+          <tr>
+            <td class="reg">ghcr.io</td>
+            <td><code>external-secrets/external-secrets</code></td>
+            <td><span class="pill opt">secrets.mode: externalSecrets</span></td>
+            <td>Public</td>
+          </tr>
+          <tr>
+            <td class="reg">registry.k8s.io</td>
+            <td><code>csi-secrets-store/driver</code>, <code>driver-crds</code>, <code>sig-storage/csi-node-driver-registrar</code>, <code>sig-storage/livenessprobe</code>, plus your cloud provider's plugin</td>
+            <td><span class="pill opt">secrets.mode: csi</span></td>
+            <td>Public</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>Firewall allowlist for Docker Hub</h3>
+        <p>Pulling from docker.io actually hits <code>registry-1.docker.io</code>, <code>auth.docker.io</code> and <code>production.cloudflare.docker.com</code>. quay.io, ghcr.io and registry.k8s.io also redirect layer downloads to CDN hosts, so allowlisting just the registry name isn't enough.</p>
+      </div>
+      <div class="note">
+        <h3>Non-image downloads during install</h3>
+        <p><code>get.k3s.io</code> and <code>github.com</code> (K3s binary), <code>kubernetes.github.io</code> (ingress-nginx chart), <code>charts.jetstack.io</code> (cert-manager chart), and the PlexTrac helm-charts repo on GitHub.</p>
+      </div>
+      <div class="note">
+        <h3>Versions</h3>
+        <p>Prerequisite image lists come from the latest upstream charts and the latest K3s release (v1.37.0+k3s1) as of 23 Sep 2026. Pinned chart versions can pull different tags, but the registries stay the same.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+</body></html>

@@ -30,20 +30,17 @@ secrets:
 
 images:
   backend:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/backend
+    repository: plextrac/plextracapi
     tag: 2.27.4
   nginx:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/nginx
+    repository: plextrac/plextracnginx
     tag: 2.27.4
-  ruxpin:
-    repository: registry.dorf.plextrac.ninja/cicd-app-images/ruxpin
-    tag: 2.18.2
   ckeditor:
-    registry: registry.dorf.plextrac.ninja
-    repository: ckeditor-registry-proxy/cs
+    registry: docker.cke-cs.com
+    repository: cs
     tag: 4.25.0
   postgres:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextracpostgres
+    repository: plextrac/plextracpostgres
     tag: stable
   redis:
     repository: redis
@@ -52,10 +49,10 @@ images:
     repository: oliver006/redis_exporter
     tag: latest
   minioBootstrap:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/plextrac-minio-bootstrap
+    repository: plextrac/plextrac-minio-bootstrap
     tag: stable
   minio:
-    repository: registry.dorf.plextrac.ninja/pt-dockerhub-proxy-ro/plextrac/minio
+    repository: plextrac/minio
     tag: latest
 
 # Extra non-secret env vars injected into the env-config ConfigMap (see the chart's values.yaml).
