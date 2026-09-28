@@ -72,7 +72,7 @@ cp .env.example .env.local
 
 Edit `.env.local` and set the following required variables: 
 
-- `DOCKER_REGISTRY`: (Default value will be pulled from .env.local file)
+- `DOCKER_REGISTRY`: (Default value will be pulled from .env.example file)
 - `DOCKER_USERNAME`: ptcustomers (#DOCKER_HUB_USER)
 - `DOCKER_PASSWORD`: (#DOCKER_HUB_KEY)
 - `CKEDITOR_DOCKER_SERVER`: docker.cke-cs.com (#IMAGE_REGISTRY)
