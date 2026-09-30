@@ -15,7 +15,7 @@ Everything outside the ingress path is internal. The browser only ever talks to 
 
 ## Registries the cluster pulls from
 
-Split into what the PlexTrac chart itself needs and what the cluster prerequisites need. Setting `global.image.registry` re-homes every chart image to a mirror except CKEditor and Synqly, which set their own registry and have to be overridden one by one.
+Split into what the PlexTrac chart itself needs and what the cluster prerequisites need. Setting `global.image.registry` re-homes every chart image to a mirror except CKEditor, which sets its own registry and has to be overridden separately.
 
 ### PlexTrac chart images
 
@@ -26,7 +26,7 @@ Split into what the PlexTrac chart itself needs and what the cluster prerequisit
 | `docker.cke-cs.com` | `cs` (CKEditor collaboration server) | required | **CKEditor login**<br>`ckeditor-registry-creds` |
 | `docker.io` | `plextrac/plextrac-keycloak` | `keycloak.enabled` | Same Docker Hub login |
 | `docker.io` | `plextrac/mcp` | `mcp.enabled` | Same Docker Hub login |
-| `quay.io` | `synqly/embedded` | `synqly.enabled` | **Quay.io login**<br>Requires its own quay.io pull secret. |
+| `docker.io` | `plextrac/plextrac-synqly-embedded` | `synqly.enabled` | Same Docker Hub login |
 | `docker.io` | `oliver006/redis_exporter:latest` | `redis.metrics.enabled` | Public |
 
 ### Cluster prerequisites

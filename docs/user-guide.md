@@ -947,7 +947,7 @@ synqly:
 - **Key management:** no external KMS is configured, so Synqly uses **AEAD** and stores its encryption keys in the database. Synqly documents this as **non-production only** (keys sit beside the data they encrypt). For production key separation, supply an external issuer/KMS Synqly supports (e.g. HashiCorp Vault Transit) via your own values.
 - **Database:** with `dedicated: false`, an init step creates a `synqly` database in the bundled Postgres and Synqly connects with the bundled credentials. With `dedicated: true`, the chart deploys a separate Postgres (`synqly-postgres` + PVC) and generates its own credentials — no further config needed.
 - **Secrets:** in `manual` mode the chart generates `synqly-root-token` and `synqly-admin` (and `synqly-db` when dedicated), preserved across upgrades. In `externalSecrets`/`csi` modes, provide those secrets yourself.
-- **Images:** `images.synqly` defaults to `quay.io/synqly/embedded` (override `images.synqly.registry` for your quay proxy/mirror); pulls use `synqly.imagePullSecrets` (default `internal-registry-creds`).
+- **Images:** `images.synqly` (`plextrac/plextrac-synqly-embedded`, registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `synqly.imagePullSecrets` for synqly-only secrets, the two are merged and deduped).
 - **Resources:** defaults are sized small for testing; raise `resources.synqly` for real workloads.
 
 ---

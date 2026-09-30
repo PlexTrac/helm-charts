@@ -210,10 +210,8 @@ images:
     repository: plextrac/plextrac-minio-bootstrap
     tag: stable
   synqly:
-    # On quay.io by default — set registry to your quay proxy/mirror to override.
-    registry: quay.io
-    repository: synqly/embedded
-    tag: embedded-2026.06.19
+    repository: plextrac/plextrac-synqly-embedded
+    tag: latest
   keycloak:
     repository: plextrac/plextrac-keycloak
     tag: stable
@@ -361,8 +359,8 @@ synqly:
   enabled: false
   organizationID: plextrac          # slug only: [a-z0-9_-.], no spaces or "@"
   organizationFullName: PlexTrac
-  imagePullSecrets:
-    - name: internal-registry-creds
+  # Pulls use global.imagePullSecrets. To add synqly-only secrets, set synqly.imagePullSecrets
+  # (merged with the global list, deduped).
   # replicas -> replicaCounts.synqly; resources -> resources.synqly
   admin:
     username: ""                    # REQUIRED when enabled: must be an email address (Synqly org admin)
