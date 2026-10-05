@@ -8,6 +8,11 @@ global:
     # repository as-is; set it to your registry/mirror to re-home all images at once,
     # e.g. registry: registry.mycompany.com
     registry: ""
+    # Optional imagePullPolicy for EVERY container. Leave "" to keep each container's built-in
+    # default (Always for the PlexTrac application images; the Kubernetes default elsewhere).
+    # Set IfNotPresent for air-gapped installs, where images are pre-loaded onto the node and
+    # no registry is reachable (docs/PlexTrac_K3s_AirGapped_Installation_Guide.md).
+    pullPolicy: ""
   ingress:
     host: ""
     tlsSecretName: internal-tls

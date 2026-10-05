@@ -1,5 +1,7 @@
 # PlexTrac K3s Installation Guide
 
+> For a server without internet access, use the [K3s air-gapped installation guide](PlexTrac_K3s_AirGapped_Installation_Guide.md) instead.
+
 ## Prerequisites
 
 Update your system packages:

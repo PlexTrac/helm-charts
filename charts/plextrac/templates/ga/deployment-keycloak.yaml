@@ -29,6 +29,9 @@ spec:
       # the bundled superuser; sets the keycloak role's password from keycloak-db-secret.
       - name: create-db
         image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
+        {{- with include "plextrac.imagePullPolicy" (dict "root" $) }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         command: ["sh", "-c"]
         args:
         - |
@@ -50,7 +53,7 @@ spec:
       containers:
       - name: keycloak
         image: {{ include "plextrac.image" (dict "image" .Values.images.keycloak "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         args: ["start"]
         ports:
         - containerPort: 8080

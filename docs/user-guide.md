@@ -28,6 +28,8 @@
 
 Read through this checklist before touching any `helm` command. Installing the chart before cluster infrastructure and credentials are in place is the most common source of failed installs.
 
+> **Server without internet access?** Follow the [air-gapped installation guide](PlexTrac_K3s_AirGapped_Installation_Guide.md) instead. It builds a bundle of K3s, Helm, the charts, and every image on a connected machine, then installs from local files.
+
 ### What the chart deploys
 
 | Workload | Kind | Default replicas |
@@ -773,6 +775,18 @@ images:
 ```
 
 You can also leave `global.image.registry` empty and put a full path (host included) directly in a component's `repository` — that still works for any component with no `registry` value.
+
+### Image pull policy
+
+By default the PlexTrac application containers use `imagePullPolicy: Always` and the others use the Kubernetes default. `global.image.pullPolicy` applies one policy to every container, including init containers and Jobs:
+
+```yaml
+global:
+  image:
+    pullPolicy: IfNotPresent   # "" (default: per-container behavior above) | Always | IfNotPresent | Never
+```
+
+Set `IfNotPresent` when the images are pre-loaded onto the node and no registry is reachable, as in the [air-gapped installation guide](PlexTrac_K3s_AirGapped_Installation_Guide.md). With `IfNotPresent`, a reused tag such as `stable` is not re-pulled, so pods keep running the image already on the node until you load a new one and restart them.
 
 ### Using a private registry (imagePullSecrets)
 

@@ -62,6 +62,9 @@ spec:
               key: UPSTREAM_CLOUD_BUCKET
               name: env-config
         image: {{ include "plextrac.image" (dict "image" .Values.images.minioBootstrap "root" $) }}
+        {{- with include "plextrac.imagePullPolicy" (dict "root" $) }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         name: bootstrap-minio
       {{- include "plextrac.imagePullSecrets" . | nindent 6 }}
       restartPolicy: Never

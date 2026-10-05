@@ -38,7 +38,7 @@ spec:
       # image/registry dependency. KEYCLOAK_INTERNAL_BASE_URL comes from env-config.
       - name: wait-for-keycloak
         image: {{ include "plextrac.image" (dict "image" (.Values.images.keycloakSetup | default .Values.images.backend) "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         command:
         - /bin/sh
         - -c
@@ -54,7 +54,7 @@ spec:
       containers:
       - name: keycloak-realm-setup
         image: {{ include "plextrac.image" (dict "image" (.Values.images.keycloakSetup | default .Values.images.backend) "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         command: ["npm", "run", "keycloak:onprem:migrate"]
         # PLATFORM_HOSTING_TYPE, KEYCLOAK_INTERNAL_BASE_URL,
         # KEYCLOAK_OIDC_BROKER_PLEXTRACAPI_INTERNAL_BASE_URL, KEYCLOAK_TENANT_REALM_ADMIN_CLIENT_ID

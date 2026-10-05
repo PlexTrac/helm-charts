@@ -55,7 +55,7 @@ spec:
       containers:
       - name: postgres
         image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         ports:
         - containerPort: 5432
         env:
