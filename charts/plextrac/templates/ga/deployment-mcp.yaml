@@ -39,7 +39,7 @@ spec:
       containers:
       - name: mcp
         image: {{ include "plextrac.image" (dict "image" .Values.images.mcp "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         ports:
         - containerPort: 8000
           name: mcp-port

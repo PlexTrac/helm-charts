@@ -94,7 +94,7 @@ spec:
               key: CKEDITOR_ENABLE_METRIC_LOGS
               name: env-config
         image: {{ include "plextrac.image" (dict "image" .Values.images.ckeditor "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         name: ckeditor-backend
         ports:
         - containerPort: 8000

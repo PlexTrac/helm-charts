@@ -74,7 +74,7 @@ spec:
         - configMapRef:
             name: env-config
         image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         name: contextual-scoring-service
         ports:
         - containerPort: 4352

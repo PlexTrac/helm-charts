@@ -182,6 +182,9 @@ spec:
               key: PG_CORE_AI_SQL_USER
               name: application-secrets
         image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
+        {{- with include "plextrac.imagePullPolicy" (dict "root" $) }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         name: postgres
         ports:
         - containerPort: 5432

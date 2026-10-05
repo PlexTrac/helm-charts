@@ -10,6 +10,7 @@
 #   # Optional registry override — applied to all images except ckeditor (which keeps its own).
 #   image:
 #     registry: ""   # e.g. registry.mycompany.com
+#     pullPolicy: "" # "" keeps per-container defaults; IfNotPresent for air-gapped installs
 #   ingress:
 #     # Required for valid Ingress objects.
 #     host: example.plextrac.com

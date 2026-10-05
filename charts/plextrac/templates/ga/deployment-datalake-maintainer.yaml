@@ -117,7 +117,7 @@ spec:
               key: LAUNCH_DARKLY_SDK_KEY
               name: shared-secrets
         image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         livenessProbe:
           failureThreshold: 3
           initialDelaySeconds: 30

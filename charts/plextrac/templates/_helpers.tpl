@@ -120,3 +120,19 @@ Call as: {{ include "plextrac.image" (dict "image" .Values.images.<component> "r
 {{- printf "%s:%s" .image.repository .image.tag -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Resolve a container's imagePullPolicy.
+  1. global.image.pullPolicy, if set, applies to every container (e.g. IfNotPresent for
+     air-gapped installs whose images are pre-loaded into the node's container runtime)
+  2. else the container's own default (pass "default"); empty means "omit the field" so
+     Kubernetes applies its own default
+Call as: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
+*/}}
+{{- define "plextrac.imagePullPolicy" -}}
+{{- $globalPolicy := "" -}}
+{{- if .root.Values.global.image -}}
+{{- $globalPolicy = .root.Values.global.image.pullPolicy | default "" -}}
+{{- end -}}
+{{- $globalPolicy | default .default | default "" -}}
+{{- end -}}

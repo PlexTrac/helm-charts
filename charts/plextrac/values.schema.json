@@ -20,7 +20,8 @@
         "image": {
           "type": "object",
           "properties": {
-            "registry": { "type": "string" }
+            "registry": { "type": "string" },
+            "pullPolicy": { "type": "string", "enum": ["", "Always", "IfNotPresent", "Never"] }
           }
         },
         "ingress": {

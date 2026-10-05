@@ -12,6 +12,7 @@ global:
     # - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
   # image:
   #   registry: ""   # set to your registry/mirror to re-home all images except ckeditor
+  #   pullPolicy: "" # IfNotPresent for air-gapped installs (images pre-loaded on the node)
   ingress:
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: internal-tls

@@ -86,6 +86,9 @@ spec:
               key: CLOUD_STORAGE_SECRET_KEY
               name: application-secrets
         image: {{ include "plextrac.image" (dict "image" .Values.images.minio "root" $) }}
+        {{- with include "plextrac.imagePullPolicy" (dict "root" $) }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         name: minio
         ports:
         - containerPort: 9000

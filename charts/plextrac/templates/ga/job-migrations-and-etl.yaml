@@ -40,7 +40,7 @@ spec:
       # existing postgres image — no extra image/registry dependency.
       - name: wait-for-postgres
         image: {{ include "plextrac.image" (dict "image" .Values.images.postgres "root" $) }}
-        imagePullPolicy: Always
+        imagePullPolicy: {{ include "plextrac.imagePullPolicy" (dict "default" "Always" "root" $) }}
         command:
         - sh
         - -c
@@ -236,6 +236,9 @@ spec:
         - configMapRef:
             name: env-config
         image: {{ include "plextrac.image" (dict "image" .Values.images.backend "root" $) }}
+        {{- with include "plextrac.imagePullPolicy" (dict "root" $) }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         name: migrations-and-etl
         volumeMounts:
         - mountPath: /usr/src/plextrac-api/uploads
