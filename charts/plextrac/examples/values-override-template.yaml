@@ -106,9 +106,8 @@
 #     repository: cke-cs/cs
 #     tag: latest
 #   synqly:
-#     registry: registry.mycompany.com   # your quay proxy/mirror (Synqly's image is on quay.io)
-#     repository: synqly/embedded
-#     tag: embedded-2026.06.19
+#     repository: plextrac/plextrac-synqly-embedded
+#     tag: latest
 #   keycloak:
 #     repository: plextrac/plextrac-keycloak
 #     tag: stable
