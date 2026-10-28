@@ -54,12 +54,8 @@ spec:
       - args:
         - |
           npm run maintenance:enableForDataOperationsIfNecessary && \
-          npm run pg:superuser:bootstrap --if-present && \
-          npm run pg:migrate && \
-          npm run pg:superuser:bootstrap:post-migration --if-present && \
           npm run db:migrate && \
           npm run ckeditor:environment:migration && \
-          npm run pg:etl up all && \
           npm run maintenance:disable && \
           npm run seed:prebuilt-content --if-present
         command:
