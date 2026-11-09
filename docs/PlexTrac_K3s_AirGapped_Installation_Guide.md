@@ -38,9 +38,9 @@ versions ingress-nginx 1.15 supports.
 
 **Staging host** (connected):
 
-- x86_64 Linux with Docker, `git`, `curl`, `sha256sum`, and Helm 3.10 or newer
+- x86_64 Linux with Docker or Podman, `git`, `curl`, `sha256sum`, and Helm 3.10 or newer
   ([Install Helm](user-guide.md#install-helm)). Use an x86_64 machine: on arm64 (for example
-  Apple Silicon), `docker save` can fail or export images that do not run on the server.
+  Apple Silicon), saving the images can fail or export images that do not run on the server.
 - Outbound access to `github.com`, `get.k3s.io`, `get.helm.sh`, `kubernetes.github.io`,
   `registry.k8s.io`, Docker Hub, and `docker.cke-cs.com`.
 - The registry logins PlexTrac provided: the PlexTrac image registry and CKEditor
@@ -164,8 +164,7 @@ Everything else comes from the chart defaults, as in a connected install. To run
 components (Synqly, Keycloak, MCP), add their settings from the
 [user guide](user-guide.md#phase-3--configure-your-values-file) now, so their images are in the
 bundle. Keycloak also needs its own DNS name and a `keycloak-tls` secret, created the same way as
-`plextrac-tls` in step 2.8. Synqly's image is on `quay.io`, so log in there too in step 1.6 if
-your account requires it.
+`plextrac-tls` in step 2.8.
 
 ### 1.5 Build the image lists
 
@@ -209,6 +208,12 @@ This must print `0`. Anything else means the chart is older than 2.29.0 or
 
 ### 1.6 Pull and save the images
 
+Use Docker or Podman. On RHEL, run `docker --version` first: if it prints `podman version`,
+`docker` is Podman (from the `podman-docker` package), so use the Podman commands. The Docker
+commands would appear to work but save only one image per archive.
+
+**Docker**
+
 ```bash
 docker login -u <plextrac-registry-username>                     # Docker Hub, unless PlexTrac gave you another registry
 docker login docker.cke-cs.com -u <ckeditor-registry-username>
@@ -225,6 +230,62 @@ Then save the images into two archives:
 docker save -o plextrac-images.tar $(cat images-plextrac.txt) && gzip -f plextrac-images.tar
 docker save -o ingress-nginx-images.tar $(cat images-ingress-nginx.txt) && gzip -f ingress-nginx-images.tar
 ```
+
+**Podman**
+
+The Podman commands differ from the Docker ones in three ways:
+
+- `podman login` needs the registry name. Without one, it logs in to the first search registry in
+  `/etc/containers/registries.conf`, not Docker Hub.
+- Podman does not assume Docker Hub for short names such as `plextrac/plextracapi:stable` or
+  `redis:8.4.0-alpine`. Depending on `short-name-mode` in `registries.conf`, the pull fails or
+  tries other registries first. The `qualify` function below adds `docker.io/` (and `library/`
+  for single names such as `redis`) so that every name is complete.
+- `podman save` needs `-m` to put more than one image in an archive. Without it, the archive holds
+  only the first image, with the other names added to it as tags.
+
+Run these in the same shell, because the later commands use `qualify`:
+
+```bash
+# Print image names in full: docker.io/ for Docker Hub, docker.io/library/ for names like redis
+qualify() {
+  awk -F/ 'NF == 1 { print "docker.io/library/" $0; next }
+           $1 ~ /[.:]/ || $1 == "localhost" { print; next }
+           { print "docker.io/" $0 }' "$@"
+}
+
+podman login docker.io -u <plextrac-registry-username>   # or the registry PlexTrac gave you
+podman login docker.cke-cs.com -u <ckeditor-registry-username>
+
+qualify images-plextrac.txt images-ingress-nginx.txt | while read -r image; do
+  podman pull --platform linux/amd64 "$image" </dev/null || echo "FAILED: $image"
+done
+```
+
+If any line says `FAILED`, fix it (usually a missing login) and pull again before you continue.
+Then save the images into two archives:
+
+```bash
+podman save -m -o plextrac-images.tar $(qualify images-plextrac.txt) && gzip -f plextrac-images.tar
+podman save -m -o ingress-nginx-images.tar $(qualify images-ingress-nginx.txt) && gzip -f ingress-nginx-images.tar
+```
+
+**Check the archives**
+
+With either tool, list the image names in each archive. This reads each archive to the end, so
+give it a minute:
+
+```bash
+for archive in plextrac-images.tar.gz ingress-nginx-images.tar.gz; do
+  echo "== $archive"
+  tar -xzOf "$archive" manifest.json | grep -o '"RepoTags":\[[^]]*]'
+done
+```
+
+Each archive must print one line per image in its list file. Podman writes full names such as
+`docker.io/plextrac/plextracapi:stable`; K3s treats them the same as the short names in the lists.
+A single line holding every name means the archive contains only one image: save it again with
+the Podman commands, including `-m`.
 
 ### 1.7 Package and checksum
 
@@ -573,7 +634,7 @@ comes back.
 
 | docker-compose step | K3s equivalent |
 |---|---|
-| `docker pull` and `docker save` a fixed image list | The list is rendered from your values (1.5), then pulled and saved (1.6) |
+| `docker pull` and `docker save` a fixed image list | The list is rendered from your values (1.5), then pulled and saved with Docker or Podman (1.6) |
 | `docker load` on the server | K3s imports archives from `/var/lib/rancher/k3s/agent/images/` (2.3) |
 | Install `docker-ce` and the `plextrac` utility | K3s and Helm from the bundle (2.4, 2.5) |
 | `plextrac initialize --air-gapped` and `AIRGAPPED=true` in `.env` | Not used. `AIRGAPPED` only told the manager utility to skip image pulls, registry logins, and self-updates. Here, `global.image.pullPolicy: IfNotPresent` does that job |
@@ -609,6 +670,20 @@ sudo k3s crictl inspecti <image>   # from your admin account
   staging host and import it as in [Upgrading](#upgrading).
 - **An ingress-nginx image ends in `@sha256:...`:** the digest overrides in
   `ingress-nginx-values.yaml` were not applied. Re-run step 2.6 with `-f ingress-nginx-values.yaml`.
+
+### Images missing or wrong after building with Podman
+
+If step 2.4 prints `MISSING` for most images, or pods crash right after the install, check the
+image IDs on the node:
+
+```bash
+sudo k3s crictl images   # from your admin account
+```
+
+When several PlexTrac images share one `IMAGE ID`, the archive was saved without `-m` and holds a
+single image under all of their names. This also happens when the Docker commands run on a host
+where `docker` is Podman. Save the archive again with the Podman commands in step 1.6, check it,
+and import it as in [Upgrading](#upgrading).
 
 ### K3s takes several minutes to start
 
