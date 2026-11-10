@@ -210,7 +210,8 @@ This must print `0`. Anything else means the chart is older than 2.29.0 or
 
 Use Docker or Podman. On RHEL, run `docker --version` first: if it prints `podman version`,
 `docker` is Podman (from the `podman-docker` package), so use the Podman commands. The Docker
-commands would appear to work but save only one image per archive.
+commands would log in to the wrong registry, fail to pull the `plextrac/...` images, and save
+only one image per archive.
 
 **Docker**
 
