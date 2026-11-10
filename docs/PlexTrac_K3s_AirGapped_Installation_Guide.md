@@ -333,7 +333,8 @@ Every line must end in `OK`.
 
 ### 2.2 Prepare RHEL 9
 
-**SELinux.** K3s supports SELinux in enforcing mode with the `k3s-selinux` policy:
+**SELinux.** Keep SELinux enforcing and install the `k3s-selinux` policy, which labels K3s's own
+files so that K3s can run on an enforcing host:
 
 ```bash
 getenforce
@@ -343,8 +344,14 @@ sudo dnf install -y --disablerepo='*' ./k3s-selinux-*.el9.noarch.rpm
 
 If `rpm -q` reports a package as not installed, install it from your internal RHEL repository or
 install media first (for example `sudo dnf install -y container-selinux`). If `getenforce`
-prints `Disabled`, you can skip the RPM; leave `selinux: true` out of the K3s configuration in
-step 2.4.
+prints `Disabled`, you can skip the RPM.
+
+Leave K3s's own SELinux option (`--selinux`, or `selinux: true` in its configuration) off, as in
+a default K3s install. When it is on, every pod gets its own SELinux label, and each pod relabels
+the volumes it mounts when it starts. The pods that share PlexTrac's uploads volume then lock each
+other out with `Permission denied`. With the option off, the host stays enforcing, but pods do not
+get labels of their own, so SELinux does not separate them from each other. K3s logs a warning
+that containerd SELinux support is disabled; that is expected.
 
 > The docker-compose air-gapped procedure ran `setenforce 0`. K3s does not need that. If your
 > site runs permissive anyway, also set `SELINUX=permissive` in `/etc/selinux/config`:
@@ -408,7 +415,7 @@ node-name: ${NODE_NAME}
 write-kubeconfig-mode: "0644"   # lets the plextrac user read the kubeconfig without sudo
 disable:
   - traefik                     # PlexTrac uses ingress-nginx
-selinux: true                   # remove this line if SELinux is disabled
+selinux: false                  # keep off, see SELinux in step 2.2
 EOF
 
 sudo env INSTALL_K3S_SKIP_DOWNLOAD=true sh ./k3s-install.sh
@@ -642,7 +649,7 @@ comes back.
 | `CKEDITOR_SERVER_LICENSE_KEY` in `.env` | `secrets.manual.generatedSecrets.shared.stringData.CKEDITOR_SERVER_LICENSE_KEY` in `my-values.yaml` |
 | `CKEDITOR_MIGRATE=true` and `docker-compose.override.yml` for `ckeditor-backend` and `ckeditor-migration` | Built in. The chart deploys `ckeditor-backend`, and the `migrations-and-etl` Job runs the CKEditor environment migration on every install and upgrade |
 | `CKEDITOR_ENABLE_METRIC_LOGS=false`, `CKEDITOR_LOG_LEVEL=40` | Not needed for an air gap: they only set CKEditor's log verbosity. The chart uses `true` and `30` and does not expose them as values |
-| `setenforce 0` | Keep SELinux enforcing with the `k3s-selinux` policy (2.2) |
+| `setenforce 0` | Keep SELinux enforcing with the `k3s-selinux` policy, and leave K3s's own SELinux option off (2.2) |
 | `plextrac configure` and `plextrac install` | `helm upgrade --install` (2.10) |
 | `plextrac logs -s plextracapi \| grep password` | `kubectl -n plextrac logs -l app=plextracapi ...` (2.12) |
 | Setting the admin password in SQL | Contact PlexTrac support |
@@ -694,6 +701,24 @@ Follow it with `sudo journalctl -u k3s -f`.
 ### K3s fails to start and mentions the node IP or a default route
 
 The server has no default route. See **Default route** in step 2.2.
+
+### Only one plextracapi pod can read uploads
+
+The other pods get `Permission denied` under `/usr/src/plextrac-api/uploads`, often after a
+restore or a restart. K3s is running with its SELinux option on (`selinux: true` in
+`/etc/rancher/k3s/config.yaml`, which earlier versions of this guide set). From your admin
+account, turn the option off, reset the labels on the volumes, and restart the PlexTrac pods:
+
+```bash
+sudo sed -i 's/^selinux: true.*/selinux: false/' /etc/rancher/k3s/config.yaml
+sudo systemctl restart k3s
+sudo restorecon -RF /var/lib/rancher/k3s/storage
+sudo k3s kubectl -n plextrac rollout restart deployment
+```
+
+`restorecon` needs `-F` here: without it, the per-pod categories stay on the files. If you added
+`seLinuxOptions` to the PlexTrac Deployments as a workaround, it has no effect once the option is
+off, and can stay.
 
 ### SELinux denials
 
