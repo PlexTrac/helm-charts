@@ -8,13 +8,19 @@ global:
   createNamespace: true
   imagePullSecrets: []
   ingress:
+    enabled: false   # Ingress objects for ingress-nginx; new installs use the gateway below
     host: plextrac.mycompany.com
     tlsSecretName: internal-tls
+    # The gateway needs a certificate in tlsSecretName (it has no fallback certificate):
+    # add a kubernetes.io/tls entry to secretObjects below, or set a cert-manager issuer.
     certManager:
-      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
+      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (bring-your-own Secret)
       email: ""      # required for letsencrypt / letsencrypt-staging
     certManagerClusterIssuer: ""   # used only when certManager.issuer is ""
-    proxyBodySize: 100m   # max upload size on every Ingress; "0" = no limit, "" = controller default (1m)
+    proxyBodySize: 100m   # ingress-nginx only: max upload size; "0" = no limit, "" = controller default (1m)
+  # Gateway API routing, served by Istio. Install the Gateway API CRDs and Istio first (docs/user-guide.md).
+  gateway:
+    enabled: true
 
 secrets:
   mode: csi

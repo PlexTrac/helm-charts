@@ -94,6 +94,9 @@ kubectl -n plextrac delete pvc --all
 | `examples/values-csi-aws.yaml` | CSI driver with AWS Secrets Manager |
 | `examples/values-csi-gcp.yaml` | CSI driver with GCP Secret Manager |
 | `examples/values-override-template.yaml` | Blank template — copy and uncomment what you need |
+| `examples/istiod-values.yaml` | Values for Istio's `istiod` chart: Istio as the Gateway API controller only |
+
+> The `values-*.yaml` examples route through Gateway API (`global.gateway.enabled: true`, `global.ingress.enabled: false`), so Istio must be installed first. `istiod-values.yaml` is for Istio's own chart, not this one. If you layer an example over an install that still uses ingress-nginx, set `global.ingress.enabled: true` and `global.gateway.enabled: false` in your own file until you [migrate](docs/runbooks/ingress-nginx_to_gateway-api.md).
 
 > All files under `charts/plextrac/examples/` are **overlays**: apply them with `-f` on top of the chart (which loads its own `values.yaml` first), and they override only the keys they contain. Layer multiple `-f` files if needed — later files win. Don't rely on an example as your only configuration if it omits keys the chart requires.
 

@@ -12,7 +12,7 @@ This runbook moves a running install over in three phases. Until the last phase,
 
 ## Before you start
 
-- Chart 2.30.0 or newer: `git pull` your clone of this repository. Upgrading to it changes nothing by itself; the Ingresses render exactly as before until you turn the gateway on.
+- Chart 2.30.0 or newer: `git pull` your clone of this repository. Upgrading to it changes nothing by itself; the Ingresses render exactly as before until you turn the gateway on. The exception: the chart's example files (`charts/plextrac/examples/values-*.yaml`) now turn the gateway on and the Ingresses off. If your `helm` command layers one of them with `-f`, set `global.gateway.enabled: false` and `global.ingress.enabled: true` in your own values file (the last `-f`) and change them as the phases below say.
 - Kubernetes 1.32 or newer (the range Istio 1.31 supports), and cert-manager 1.15 or newer if you use it. Commands use `helm` and `jq`, as in the user guide.
 - **A TLS Secret must exist** for `global.ingress.tlsSecretName` (and for Keycloak, `keycloak-tls` unless you set `keycloak.tlsSecretName`). ingress-nginx serves its own self-signed certificate when the Secret is missing; the gateway serves nothing. Check with `kubectl -n plextrac get secret internal-tls`. If it is missing, set `global.ingress.certManager.issuer: selfSigned` or create the Secret ([TLS options](../user-guide.md#reference-tls-configuration)) before Phase 2.
 - The commands assume the namespace and release `plextrac` and your values in `my-values.yaml`, run from the root of this repository. They also use the `jetstack` and `ingress-nginx` Helm repos from your original install; check with `helm repo list`.

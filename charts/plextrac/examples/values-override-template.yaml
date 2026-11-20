@@ -12,18 +12,27 @@
 #     registry: ""   # e.g. registry.mycompany.com
 #     pullPolicy: "" # "" keeps per-container defaults; IfNotPresent for air-gapped installs
 #   ingress:
-#     # Required for valid Ingress objects.
+#     # Ingress objects for ingress-nginx. The chart default is true so existing installs upgrade
+#     # unchanged; new installs turn them off and use the gateway below.
+#     enabled: false
+#     # Hostname of the app, used by the gateway routes and the Ingresses.
 #     host: example.plextrac.com
-#     # TLS secret used by plextracnginx ingress.
+#     # TLS Secret for the app host. The gateway needs one: it has no fallback certificate.
 #     tlsSecretName: internal-tls
-#     # cert-manager TLS. issuer: letsencrypt | letsencrypt-staging | selfSigned | "" (none / BYO)
+#     # cert-manager TLS. issuer: letsencrypt | letsencrypt-staging | selfSigned | "" (bring-your-own Secret)
 #     certManager:
 #       issuer: ""
 #       email: ""                    # required for letsencrypt / letsencrypt-staging
-#     # Used only when certManager.issuer is "" — bring your own issuer:
+#     # Used only when certManager.issuer is "" (bring your own issuer):
 #     certManagerClusterIssuer: ""
-#     # Max request body (upload) size on every Ingress. "0" = no limit, "" = controller default (1m).
+#     # ingress-nginx only: max request body (upload) size. "0" = no limit, "" = controller default (1m).
 #     proxyBodySize: 100m
+#   # Gateway API routing, served by Istio. Install the Gateway API CRDs and Istio first.
+#   gateway:
+#     enabled: true
+#     className: istio
+#     # LoadBalancer takes ports 80/443. ClusterIP keeps the gateway unexposed (migration staging).
+#     serviceType: LoadBalancer
 
 # secrets:
 #   # Choose one: externalSecrets | csi | manual
