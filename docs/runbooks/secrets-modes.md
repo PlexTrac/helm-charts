@@ -12,7 +12,7 @@ Regardless of mode, workloads expect these Kubernetes Secrets by name:
 
 - `application-secrets` (`Opaque`)
 - `shared-secrets` (`Opaque`)
-- `internal-tls` (`kubernetes.io/tls`) when ingress TLS is enabled
+- `internal-tls` (`kubernetes.io/tls`), the app's certificate. Required with Gateway API routing; ingress-nginx falls back to its own self-signed certificate without it
 - A registry pull secret only if using a private image registry (configured via `global.imagePullSecrets`)
 
 Notes:
@@ -125,7 +125,7 @@ Required setup:
 
 1. Create `application-secrets` and `shared-secrets` with all keys required by GA workloads.
 2. Create the image pull secret (this guide uses `internal-registry-creds`; the name must match `global.imagePullSecrets`).
-3. Create TLS secret `internal-tls` if ingress TLS is used.
+3. Create TLS secret `internal-tls` (required with Gateway API routing).
 
 Example creation commands:
 

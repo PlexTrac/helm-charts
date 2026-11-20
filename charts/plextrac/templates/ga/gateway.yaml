@@ -1,0 +1,90 @@
+{{- /*
+Gateway API entry point (global.gateway.enabled), served by Istio. Mirrors the routing of the
+Ingresses in this folder; the routes are in httproutes.yaml.
+
+istiod deploys the proxy for this Gateway: a Deployment and a Service named
+"plextrac-<gatewayClassName>" (plextrac-istio) in this namespace.
+
+Neither app listener sets a hostname, matching ingress-nginx: any Host is accepted on 80 and 443,
+the app routes match global.ingress.host and everything else falls through to the hostless
+plextracnginx-default route. Keycloak gets its own HTTPS listener so it can serve its own
+certificate, unless it shares the app's TLS Secret (one wildcard certificate), in which case the
+app's listener serves it: browsers reuse one HTTP/2 connection for every host a certificate
+covers, and Istio only routes the hosts attached to the listener the connection started on.
+*/ -}}
+{{- if .Values.global.gateway.enabled }}
+{{- $gw := .Values.global.gateway -}}
+{{- $appTls := include "plextrac.ingressTlsSecretName" . -}}
+{{- $kcTls := include "plextrac.keycloakTlsSecretName" . -}}
+{{- $isIstio := eq ($gw.className | default "istio") "istio" -}}
+{{- if $isIstio }}
+# Istio overlays this on the Service it generates for the Gateway (spec.infrastructure.parametersRef):
+#   - type: LoadBalancer takes ports 80/443 on the node (K3s ServiceLB) or a cloud load balancer.
+#     ClusterIP keeps the gateway unexposed while ingress-nginx still serves traffic (migration).
+#   - The generated Service always carries Envoy's status port 15021. Drop it so only 80/443 are
+#     exposed, as with ingress-nginx.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plextrac-gateway
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+data:
+  service: |
+    spec:
+      type: {{ $gw.serviceType | default "LoadBalancer" }}
+      ports:
+        - port: 15021
+          $patch: delete
+---
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: plextrac
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  gatewayClassName: {{ $gw.className | default "istio" }}
+{{- if $isIstio }}
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: plextrac-gateway
+{{- end }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $appTls }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- if and .Values.keycloak.enabled (ne $kcTls $appTls) }}
+    - name: https-keycloak
+      hostname: {{ .Values.keycloak.host | quote }}
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $kcTls }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- end }}
+{{- end }}

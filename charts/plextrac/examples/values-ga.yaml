@@ -2,7 +2,11 @@ global:
   namespace: plextrac
   createNamespace: true
   ingress:
-    proxyBodySize: 100m   # max upload size on every Ingress; "0" = no limit, "" = controller default (1m)
+    enabled: false        # Ingress objects for ingress-nginx; routing goes through the gateway below
+    proxyBodySize: 100m   # ingress-nginx only: max upload size; "0" = no limit, "" = controller default (1m)
+  # Gateway API routing, served by Istio. Its certificate is the internal-tls ExternalSecret below.
+  gateway:
+    enabled: true
 
 secrets:
   mode: externalSecrets

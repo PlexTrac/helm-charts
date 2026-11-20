@@ -1,3 +1,4 @@
+{{- if .Values.global.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -25,3 +26,4 @@ spec:
               number: 8000
         path: /ws-v2
         pathType: ImplementationSpecific
+{{- end }}

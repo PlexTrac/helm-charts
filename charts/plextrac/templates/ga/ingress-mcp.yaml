@@ -1,4 +1,4 @@
-{{- if .Values.mcp.enabled }}
+{{- if and .Values.global.ingress.enabled .Values.mcp.enabled }}
 # MCP is served as a path (/mcp) on the main app host — it shares that host's TLS
 # (provided by the plextracnginx ingress), so no separate hostname/cert is needed.
 apiVersion: networking.k8s.io/v1

@@ -26,6 +26,71 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- default "internal-tls" .Values.global.ingress.tlsSecretName -}}
 {{- end -}}
 
+{{- define "plextrac.keycloakTlsSecretName" -}}
+{{- default "keycloak-tls" .Values.keycloak.tlsSecretName -}}
+{{- end -}}
+
+{{/*
+Gateway API (Istio) routing, rendered when global.gateway.enabled. It can run next to the
+Ingresses (global.ingress.enabled) while a cluster migrates from ingress-nginx.
+
+"plextrac.gatewayServesHTTP" is "true" when the Istio gateway, not ingress-nginx, answers on port
+80: the Ingresses are off, or both are rendered and the gateway Service is a LoadBalancer (the
+cutover step of a migration). It picks the ACME HTTP-01 solver of the chart-managed Issuers,
+because Let's Encrypt only reaches whichever controller holds port 80.
+*/}}
+{{- define "plextrac.gatewayServesHTTP" -}}
+{{- $gw := .Values.global.gateway | default dict -}}
+{{- if and $gw.enabled (or (not .Values.global.ingress.enabled) (eq ($gw.serviceType | default "LoadBalancer") "LoadBalancer")) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/* ACME HTTP-01 solver for the chart-managed Issuers. Call with the root context. */}}
+{{- define "plextrac.acmeHTTP01Solver" -}}
+{{- if include "plextrac.gatewayServesHTTP" . -}}
+- http01:
+    gatewayHTTPRoute:
+      parentRefs:
+        - kind: Gateway
+          name: plextrac
+          namespace: {{ include "plextrac.namespace" . }}
+          sectionName: http
+{{- else -}}
+- http01:
+    ingress:
+      ingressClassName: nginx
+{{- end -}}
+{{- end -}}
+
+{{/*
+HTTPRoute filters for what ingress-nginx did implicitly:
+  - X-Real-IP: ingress-nginx sets it on every request and the API logs the client IP from it.
+    Envoy has no such header, so it is set from the downstream address (an Envoy command operator;
+    Istio passes it through unescaped). A literal "%" in a header value must be written "%%".
+  - Strict-Transport-Security: ingress-nginx adds it to responses on TLS hosts. Browsers ignore it
+    on plain-HTTP responses, so the same rule can serve both listeners.
+  - Server: ingress-nginx drops the backend's Server header; Envoy passes it through
+    ("Server: nginx" from plextracnginx, "Server: MinIO" on uploads).
+Call as {{ include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}.
+*/}}
+{{- define "plextrac.gatewayEdgeFilters" -}}
+- type: RequestHeaderModifier
+  requestHeaderModifier:
+    set:
+      - name: X-Real-IP
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+- type: ResponseHeaderModifier
+  responseHeaderModifier:
+{{- if .hsts }}
+    set:
+      - name: Strict-Transport-Security
+        value: "max-age=31536000; includeSubDomains"
+{{- end }}
+    remove:
+      - Server
+{{- end -}}
+
 {{- define "plextrac.validateSecretMode" -}}
 {{- if not (has .Values.secrets.mode (list "externalSecrets" "csi" "manual")) -}}
 {{- fail "values.secrets.mode must be one of: externalSecrets, csi, manual" -}}

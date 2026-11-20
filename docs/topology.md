@@ -11,6 +11,8 @@ What the Helm chart runs, how traffic reaches it, and every container registry a
 
 **Key:** solid teal line = ingress route (path or host) · solid box = always deployed · dashed amber box = optional, off by default (flag shown in the box)
 
+**Gateway API (chart 2.30.0 and later):** new installs replace the ingress-nginx box with Istio. The chart renders a `Gateway` named `plextrac` (its proxy runs as `plextrac-istio` in the plextrac namespace) and one `HTTPRoute` per path in the diagram. Paths, hosts and backends are unchanged; ingress-nginx remains for installs that have not [migrated](runbooks/ingress-nginx_to_gateway-api.md).
+
 Everything outside the ingress path is internal. The browser only ever talks to ingress-nginx, which sends `/` to the web UI, `/api/` and `/graphql` straight to plextracapi, `/ws-v2` to CKEditor, and `/cloud/uploads/` to MinIO. The API, CKEditor and the workers reach the data stores by Service name (`plextracdb`, `postgres`, `redis`, `minio`). Replica counts are chart defaults.
 
 ## Registries the cluster pulls from
@@ -33,7 +35,8 @@ Split into what the PlexTrac chart itself needs and what the cluster prerequisit
 
 | Registry | Images | When | Pull credentials |
 |---|---|---|---|
-| `registry.k8s.io` | `ingress-nginx/controller`, `ingress-nginx/kube-webhook-certgen` | required | Public |
+| `docker.io` | `istio/pilot`, `istio/proxyv2` (tagged with the Istio version) | Gateway API routing | Public |
+| `registry.k8s.io` | `ingress-nginx/controller`, `ingress-nginx/kube-webhook-certgen` | ingress-nginx routing (not migrated) | Public |
 | `docker.io` | `rancher/*`: klipper-lb, local-path-provisioner, mirrored-coredns-coredns, mirrored-metrics-server, mirrored-pause, klipper-helm, mirrored-library-busybox | K3s installs | Public |
 | `quay.io` | `jetstack/cert-manager-controller`, `-webhook`, `-cainjector`, `-startupapicheck` | cert-manager TLS | Public |
 | `ghcr.io` | `external-secrets/external-secrets` | `secrets.mode: externalSecrets` | Public |
@@ -45,7 +48,7 @@ Pulling from docker.io actually hits `registry-1.docker.io`, `auth.docker.io` an
 
 ### Non-image downloads during install
 
-`get.k3s.io` and `github.com` (K3s binary), `kubernetes.github.io` (ingress-nginx chart), `charts.jetstack.io` (cert-manager chart), and the PlexTrac helm-charts repo on GitHub.
+`get.k3s.io` and `github.com` (K3s binary, Gateway API CRDs), `blob.istio.io` (Istio charts), `charts.jetstack.io` (cert-manager chart), the PlexTrac helm-charts repo on GitHub, and `kubernetes.github.io` (ingress-nginx chart) on installs that still use it.
 
 ### Versions
 

@@ -1,0 +1,320 @@
+{{- /*
+One HTTPRoute per Ingress in this folder (global.gateway.enabled), attached to the plextrac
+Gateway (gateway.yaml). Behavior matches the Ingresses as ingress-nginx serves them:
+
+  - Paths: ingress-nginx treats these ImplementationSpecific paths as plain prefixes. PathPrefix is
+    element-wise (/graphqlX no longer matches /graphql) and ignores a trailing slash (/api now
+    reaches plextracapi instead of plextracnginx). The longest prefix wins, so the order below
+    does not matter.
+  - Every app path needs a rule on the app hostname: Istio does not fall back from a hostname to
+    the hostless plextracnginx-default route.
+  - Timeouts: Envoy's route timeout is a deadline for the whole response, not nginx's idle time
+    between reads. Request/response routes keep their Ingress values. Streaming, websocket and
+    upload routes set 0s (no deadline), which is also Istio's default and turns off Envoy's stream
+    idle timeout.
+  - No request body limit: global.ingress.proxyBodySize is an ingress-nginx setting. The Istio
+    gateway streams bodies through without a cap; the application enforces its own limits.
+  - X-Real-IP and HSTS, which ingress-nginx added implicitly: see plextrac.gatewayEdgeFilters.
+*/ -}}
+{{- if .Values.global.gateway.enabled }}
+{{- $ns := include "plextrac.namespace" . -}}
+{{- $host := include "plextrac.ingressHost" . -}}
+{{- $appTls := include "plextrac.ingressTlsSecretName" . -}}
+{{- $kcTls := include "plextrac.keycloakTlsSecretName" . -}}
+# plextracapi (plextracapi-ingress)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: plextracapi
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      timeouts:
+        request: 6000s
+      backendRefs:
+        - name: plextracapi
+          port: 4350
+---
+# graphql (graphql-ingress)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: graphql
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /graphql
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      timeouts:
+        request: 300s
+      backendRefs:
+        - name: plextracapi
+          port: 4350
+---
+# ckeditor (ckeditor-ingress), websocket
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ckeditor
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ws-v2
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      timeouts:
+        request: 0s # websocket
+      backendRefs:
+        - name: ckeditor
+          port: 8000
+---
+# minio (minio-ingress)
+# Presigned upload URLs are signed for host minio:9000 and then rewritten to the public origin,
+# so MinIO must see Host: minio:9000, like upstream-vhost on the Ingress. Istio turns a Host
+# header set into a host rewrite.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: minio
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cloud/uploads/
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: Host
+                value: minio:9000
+              - name: X-Real-IP
+                value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      timeouts:
+        request: 0s # large uploads and downloads
+      backendRefs:
+        - name: minio
+          port: 9000
+---
+# plextracnginx (plextracnginx-ingress, app host rule): the web UI, plus everything plextracnginx
+# proxies itself (API websockets on /ws).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: plextracnginx
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      timeouts:
+        request: 0s # API websockets on /ws
+      backendRefs:
+        - name: plextracnginx-svc
+          port: 80
+---
+# plextracnginx-default (plextracnginx-ingress, rule without a host): any other Host gets
+# plextracnginx. Attached to the app listeners only, so it never competes with the Keycloak route
+# on the Keycloak listener.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: plextracnginx-default
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+      sectionName: http
+    - name: plextrac
+      sectionName: https
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" false) | nindent 8 }}
+      timeouts:
+        request: 0s
+      backendRefs:
+        - name: plextracnginx-svc
+          port: 80
+{{- if .Values.mcp.enabled }}
+---
+# mcp (mcp-ingress): /mcp/foo -> /foo, with CORS for MCP clients.
+# Anything under /mcp/metrics is rewritten to a path the server does not have, so it gets the same
+# 404 as any unknown route (the longer prefix wins over /mcp). This is standard Gateway API, so it
+# is always on here; mcp.blockMetricsPath only controls the nginx snippet on the Ingress.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp/metrics
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /_blocked
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      backendRefs:
+        - name: mcp
+          port: 8000
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: CORS
+          cors:
+            allowOrigins:
+              - "*"
+            allowMethods:
+              - GET
+              - POST
+              - DELETE
+              - OPTIONS
+            allowHeaders:
+              - Content-Type
+              - Accept
+              - Authorization
+              - mcp-session-id
+              - mcp-protocol-version
+            maxAge: 1728000 # ingress-nginx cors-max-age default
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      timeouts:
+        request: 0s # streaming responses (a deadline would cap the whole stream)
+      backendRefs:
+        - name: mcp
+          port: 8000
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+---
+# keycloak (keycloak ingress), on its own host. Attached to the app's HTTPS listener as well, for
+# browsers that reuse an app-host HTTP/2 connection when one certificate covers both hosts.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+      sectionName: https
+{{- if ne $kcTls $appTls }}
+    - name: plextrac
+      sectionName: https-keycloak
+{{- end }}
+  hostnames:
+    - {{ .Values.keycloak.host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        {{- include "plextrac.gatewayEdgeFilters" (dict "hsts" true) | nindent 8 }}
+      backendRefs:
+        - name: keycloak-internal
+          port: 80
+---
+# keycloak-redirect: HTTP to HTTPS on the Keycloak host, as ingress-nginx does for a TLS host
+# without ssl-redirect: "false". ACME HTTP-01 challenges still get through: cert-manager's
+# challenge route matches the exact token path, which wins over this rule's "/" prefix.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-redirect
+  namespace: {{ $ns }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: plextrac
+      sectionName: http
+  hostnames:
+    - {{ .Values.keycloak.host | quote }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 308
+{{- end }}
+{{- end }}
