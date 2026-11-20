@@ -12,11 +12,7 @@ Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostn
 
 > **Installed with an earlier version of this guide?** It routed through ingress-nginx, which
 > keeps working after upgrades: the chart keeps its Ingresses unless you turn them off. To move
-> to Gateway API, transfer Istio's charts and images (steps 1.3 to 1.6) and `standard-install.yaml`
-> from [Gateway API v1.6.3](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.3)
-> (K3s 1.35, which that version installed, does not include the Gateway API CRDs). Then follow
-> the [migration runbook](runbooks/ingress-nginx_to_gateway-api.md), using those local files
-> instead of the Helm repositories and download URLs.
+> to Gateway API, see [Moving from ingress-nginx to Gateway API](#moving-from-ingress-nginx-to-gateway-api).
 
 ## How it works
 
@@ -686,6 +682,206 @@ comes back.
 > container uses, including images that only Jobs use (`bootstrap-minio`, and the K3s Job that
 > installs the Gateway API CRDs). The node cannot pull them back; they return only when K3s
 > restarts and re-imports its archives.
+
+---
+
+## Moving from ingress-nginx to Gateway API
+
+Earlier versions of this guide installed K3s v1.35.9 and ingress-nginx 4.15.1 and routed through
+the chart's Ingresses. ingress-nginx gets no more security fixes, so move such an install to
+Gateway API. This section does that from local files, in the three phases of the
+[migration runbook](runbooks/ingress-nginx_to_gateway-api.md), which explains each phase and what
+behaves differently afterwards. Use the commands here instead of the runbook's: they replace its
+Helm repositories, download URLs and paths.
+
+K3s stays at v1.35, which Istio 1.31 supports. K3s 1.35 does not install the Gateway API CRDs, so
+the bundle carries them. The move rides on a PlexTrac upgrade: the bundle is an
+[upgrade](#upgrading) bundle with Istio and the CRDs added.
+
+### Build the bundle
+
+On the staging host, in the directory of your original bundle, download the Istio charts and the
+Gateway API CRDs. Run this and the rest of this part in one shell:
+
+```bash
+cd ~/plextrac-airgap
+export ISTIO_VERSION="1.31.4"
+
+helm pull base --repo https://blob.istio.io/istio-release/charts --version "${ISTIO_VERSION}"
+helm pull istiod --repo https://blob.istio.io/istio-release/charts --version "${ISTIO_VERSION}"
+curl -fLO https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
+```
+
+If your upgrade path has more than one step, do the earlier steps first as described in
+[Upgrading](#upgrading), and use this section for the last one. The earlier steps keep
+ingress-nginx.
+
+Update the chart:
+
+```bash
+git -C helm-charts pull   # or check out the release you are moving to
+grep '^version:' helm-charts/charts/plextrac/Chart.yaml   # must be 2.30.0 or later
+```
+
+Then re-run steps 1.5 and 1.6 with your existing `my-values.yaml`; don't replace it with the one
+in step 1.4. Besides the PlexTrac images, they now list Istio's two images and save them in
+`istio-images.tar.gz`. Package and checksum what you will transfer:
+
+```bash
+tar -czf helm-charts.tar.gz helm-charts
+sha256sum \
+  helm-charts.tar.gz images-plextrac.txt plextrac-images.tar.gz \
+  "base-${ISTIO_VERSION}.tgz" "istiod-${ISTIO_VERSION}.tgz" images-istio.txt istio-images.tar.gz \
+  standard-install.yaml \
+  > SHA256SUMS.gateway
+```
+
+Transfer the files listed in `SHA256SUMS.gateway`, plus `SHA256SUMS.gateway` itself, into
+`/opt/plextrac-airgap` on the server.
+
+### Upgrade PlexTrac and install Istio
+
+From your admin account, verify the files and add both image archives to K3s. As in
+[Upgrading](#upgrading), each archive is copied under a temporary name first, so that K3s imports
+only complete files while it runs:
+
+```bash
+cd /opt/plextrac-airgap
+sudo chown plextrac:plextrac $(awk '{print $2}' SHA256SUMS.gateway) SHA256SUMS.gateway
+sudo chmod 644 $(awk '{print $2}' SHA256SUMS.gateway) SHA256SUMS.gateway
+sudo sha256sum -c SHA256SUMS.gateway
+
+for archive in plextrac-images.tar.gz istio-images.tar.gz; do
+  sudo cp "$archive" "/var/lib/rancher/k3s/agent/images/${archive}.tmp"
+  sudo mv "/var/lib/rancher/k3s/agent/images/${archive}.tmp" \
+    "/var/lib/rancher/k3s/agent/images/${archive}"
+done
+sudo journalctl -u k3s --since "15 min ago" | grep 'Imported'
+```
+
+K3s logs `Imported N images from ...` for each archive a few seconds after it is moved into
+place. Then run the image check from [step 2.4](#24-install-k3s). It now covers the Istio images
+too; every image must print `ok`.
+
+As the `plextrac` user, upgrade PlexTrac to the new chart and images, as in
+[Upgrading](#upgrading). ingress-nginx keeps serving:
+
+```bash
+cd /opt/plextrac-airgap
+rm -rf helm-charts && tar -xzf helm-charts.tar.gz
+
+helm upgrade --install plextrac ./helm-charts/charts/plextrac \
+  --namespace plextrac \
+  -f my-values.yaml \
+  --wait --wait-for-jobs --timeout 15m
+
+kubectl -n plextrac rollout restart deployment
+kubectl -n plextrac rollout status deployment/plextracapi --timeout 15m
+```
+
+Install the Gateway API CRDs, then Istio from the bundled charts. These are the runbook's Phase 1,
+steps 1 and 2; its step 3 is for cert-manager, which this guide does not use:
+
+```bash
+kubectl apply --server-side -f standard-install.yaml
+
+helm upgrade --install istio-base ./base-*.tgz \
+  --namespace istio-system --create-namespace \
+  --set defaultRevision=default \
+  --wait
+helm upgrade --install istiod ./istiod-*.tgz \
+  --namespace istio-system \
+  -f helm-charts/charts/plextrac/examples/istiod-values.yaml \
+  --wait
+
+kubectl -n istio-system get pods
+```
+
+### Phase 1: Prepare
+
+Add the gateway to `my-values.yaml`, unexposed for now, under the existing `global` key:
+
+```yaml
+global:
+  gateway:
+    enabled: true
+    serviceType: ClusterIP   # removed again in Phase 2
+```
+
+Upgrade, check the gateway, and test it through a port-forward while ingress-nginx keeps serving
+users:
+
+```bash
+helm upgrade plextrac ./helm-charts/charts/plextrac -n plextrac -f my-values.yaml --wait --timeout 15m
+
+kubectl -n plextrac get gateway plextrac    # PROGRAMMED True
+kubectl -n plextrac get httproute
+kubectl -n plextrac port-forward svc/plextrac-istio 8443:443 &
+sleep 2
+curl -sk --resolve plextrac.mycompany.com:8443:127.0.0.1 \
+  https://plextrac.mycompany.com:8443/api/v2/health/full
+kill %1
+```
+
+### Phase 2: Cut over
+
+Delete the `serviceType: ClusterIP` line from `my-values.yaml` and upgrade. Then release ports 80
+and 443 from ingress-nginx. `./ingress-nginx-*.tgz` is the chart you installed it from, and
+`--reuse-values` keeps the settings from `ingress-nginx-values.yaml`:
+
+```bash
+helm upgrade plextrac ./helm-charts/charts/plextrac -n plextrac -f my-values.yaml --wait --timeout 15m
+helm upgrade ingress-nginx ./ingress-nginx-*.tgz -n ingress-nginx \
+  --reuse-values --set controller.service.type=ClusterIP
+```
+
+The gateway takes the ports within a second or two. Run the checks from
+[step 2.11](#211-verify), then sign in through a browser.
+
+To roll back, any time before Phase 3:
+
+```bash
+helm upgrade ingress-nginx ./ingress-nginx-*.tgz -n ingress-nginx \
+  --reuse-values --set controller.service.type=LoadBalancer
+# put "serviceType: ClusterIP" back under global.gateway in my-values.yaml, then:
+helm upgrade plextrac ./helm-charts/charts/plextrac -n plextrac -f my-values.yaml --wait --timeout 15m
+```
+
+### Phase 3: Clean up
+
+In `my-values.yaml`, add `enabled: false` under `global.ingress`. Keep `host` and `tlsSecretName`
+there: the gateway uses them. Then upgrade and remove ingress-nginx:
+
+```bash
+helm upgrade plextrac ./helm-charts/charts/plextrac -n plextrac -f my-values.yaml --wait --timeout 15m
+kubectl -n plextrac get ingress   # No resources found
+
+helm uninstall ingress-nginx -n ingress-nginx
+kubectl delete namespace ingress-nginx
+```
+
+Deleting the namespace can take a few minutes while the ingress-nginx controller drains its
+connections.
+
+Make the same two changes to `my-values.yaml` on the staging host (`gateway.enabled: true`,
+`ingress.enabled: false`), so that it matches the server for later upgrades. From now on,
+[Upgrading](#upgrading) applies as written.
+
+To return to ingress-nginx after Phase 3, keep its files in `/opt/plextrac-airgap` and its image
+archive in K3s's images directory. Reinstall it with a ClusterIP Service (the runbook explains
+why):
+
+```bash
+helm upgrade --install ingress-nginx ./ingress-nginx-*.tgz \
+  --namespace ingress-nginx --create-namespace \
+  -f ingress-nginx-values.yaml --set controller.service.type=ClusterIP \
+  --wait
+```
+
+Don't leave out `-f ingress-nginx-values.yaml`: without it, the chart refers to the ingress-nginx
+images by their registry digests, which the imported images do not match, so the kubelet tries to
+pull them. Then set `global.ingress.enabled: true`, upgrade PlexTrac, and roll back as in Phase 2.
+Upgrade PlexTrac first: until its Ingresses exist, ingress-nginx answers every request with 404.
 
 ---
 
