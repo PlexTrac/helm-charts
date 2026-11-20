@@ -2,6 +2,7 @@
 Optional cert-manager Issuer for the keycloak ingress cert (namespaced), rendered only when
 keycloak.certManager.issuer is a built-in value. Leave it "" to bring your own issuer
 (keycloak.certManagerClusterIssuer) or a pre-created keycloak-tls secret. Requires cert-manager.
+The HTTP-01 solver follows whichever controller answers port 80 (plextrac.acmeHTTP01Solver).
 */ -}}
 {{- if .Values.keycloak.enabled -}}
 {{- $cm := .Values.keycloak.certManager | default dict -}}
@@ -30,9 +31,7 @@ spec:
     privateKeySecretRef:
       name: keycloak-acme-account-key
     solvers:
-      - http01:
-          ingress:
-            ingressClassName: nginx
+      {{- include "plextrac.acmeHTTP01Solver" . | nindent 6 }}
 {{- end }}
 {{- end -}}
 {{- end }}

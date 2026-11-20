@@ -6,6 +6,8 @@ Rendered only when global.ingress.certManager.issuer is set to a built-in value:
   letsencrypt-staging -> same against LE staging (untrusted, rate-limit-safe for testing)
 When issuer is "" the chart renders nothing here and the ingress falls back to
 global.ingress.certManagerClusterIssuer (bring-your-own). Requires cert-manager installed.
+The HTTP-01 solver follows whichever controller answers port 80 (plextrac.acmeHTTP01Solver):
+ingress-nginx, or the Istio gateway, which needs cert-manager's Gateway API support enabled.
 */ -}}
 {{- $cm := .Values.global.ingress.certManager | default dict -}}
 {{- $issuer := $cm.issuer | default "" -}}
@@ -33,8 +35,6 @@ spec:
     privateKeySecretRef:
       name: plextrac-acme-account-key
     solvers:
-      - http01:
-          ingress:
-            ingressClassName: nginx
+      {{- include "plextrac.acmeHTTP01Solver" . | nindent 6 }}
 {{- end }}
 {{- end -}}

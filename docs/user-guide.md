@@ -74,10 +74,10 @@ Read through this checklist before touching any `helm` command. Installing the c
 |---|---|
 | Kubernetes | 1.25 |
 | Helm | 3.10 |
-| NGINX Ingress Controller | any current release |
+| Istio (Gateway API controller) | 1.31, installed in Step 1.2 |
 | `jq` | any — **required** by `scripts/setup-registry-credentials.sh` (Phase 2.2) |
 
-> All Ingress resources use `ingressClassName: nginx`. Other ingress controllers are not supported without changes to annotations and ingress class values.
+> New installs route through the Kubernetes Gateway API, served by Istio: the chart renders a Gateway and one HTTPRoute per path group (`global.gateway.enabled`). The Ingress objects (`global.ingress.enabled`, `ingressClassName: nginx`) stay available for clusters still on ingress-nginx, which was retired upstream in March 2026. To move such a cluster over, see [Migrate from ingress-nginx to Gateway API](runbooks/ingress-nginx_to_gateway-api.md).
 
 > `jq` is not preinstalled on fresh Ubuntu/Debian/RHEL. Install it before Phase 2.2: `apt install jq` / `dnf install jq` / `brew install jq`.
 
@@ -124,7 +124,7 @@ K3s bundles containerd, CoreDNS, metrics-server, and the `local-path` StorageCla
 **OS requirements:**
 - Linux: Ubuntu 20.04+, Debian 11+, RHEL/Rocky/AlmaLinux 8+
 - Kernel ≥ 5.4
-- Ports 6443 (API), 80 and 443 (ingress) open
+- Ports 6443 (API), 80 and 443 (gateway) open
 - **Minimum node sizing:** 4 vCPU, 16 GiB RAM, 100 GiB disk
 
 **Before installing K3s:**
@@ -151,7 +151,7 @@ echo "K3s node name: $NODE_NAME"
 # Install K3s in the SAME shell so $NODE_NAME is set. These args are baked into the K3s
 # systemd unit and reused on every start:
 #   --node-name             pins the node name, independent of the long/reset-on-boot hostname
-#   --disable traefik       PlexTrac uses NGINX; running both conflicts
+#   --disable traefik       PlexTrac's routing runs on Istio; Traefik would hold ports 80/443
 #   --write-kubeconfig-mode makes /etc/rancher/k3s/k3s.yaml readable by your non-root user
 #                           (644 = readable by any local user on this host; fine for a
 #                           dedicated single-node appliance)
@@ -177,29 +177,34 @@ For EKS, enable the **EBS CSI driver** add-on before installing, or PVCs will no
 
 ---
 
-### Step 1.2 — Install NGINX Ingress Controller
+### Step 1.2 — Install Gateway API and Istio
 
-Run this on every platform (K3s, GKE, AKS, EKS):
+PlexTrac's routing uses the Kubernetes Gateway API, served by Istio (the same setup as PlexTrac's cloud). Run this on every platform (K3s, GKE, AKS, EKS), from the root of this repository.
+
+Install the Gateway API CRDs unless they are already there (K3s 1.37 and newer installs them itself):
 
 ```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1 || \
+  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
+```
+
+Install Istio as the Gateway API controller only (no sidecars, no mesh). `istiod-values.yaml` sizes it for a single node and keeps it from acting on Ingress objects:
+
+```bash
+helm repo add istio https://blob.istio.io/istio-release/charts
 helm repo update
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx \
-  --create-namespace \
-  --wait
+helm upgrade --install istio-base istio/base -n istio-system --create-namespace \
+  --version 1.31.4 --set defaultRevision=default --wait
+helm upgrade --install istiod istio/istiod -n istio-system --version 1.31.4 \
+  -f charts/plextrac/examples/istiod-values.yaml --wait
+kubectl get gatewayclass istio   # ACCEPTED True
 ```
 
-Confirm it is running:
+istiod deploys the gateway proxy itself (Deployment and Service `plextrac-istio` in the `plextrac` namespace) when you install the chart in Phase 4. Pulling from a private registry or mirror: set `global.hub` and `global.imagePullSecrets` in `istiod-values.yaml`.
 
-```bash
-kubectl -n ingress-nginx get pods
-kubectl -n ingress-nginx get svc ingress-nginx-controller
-```
+On a managed cluster (GKE/AKS/EKS) the gateway's Service gets a cloud load balancer `EXTERNAL-IP` during Phase 4: create the DNS record then, from `kubectl -n plextrac get svc plextrac-istio`. With Let's Encrypt, cert-manager keeps retrying the challenge until the record resolves.
 
-On a managed cluster (GKE/AKS/EKS) the `ingress-nginx-controller` Service gets a real cloud `EXTERNAL-IP` once the LoadBalancer is provisioned — note it for DNS in the next step.
-
-> **On K3s (single VM), the `EXTERNAL-IP` shown is the node's own IP**, not a public address. K3s's built-in load balancer (ServiceLB) assigns the node address, and on a cloud VM that is the **internal/private** IP — the public IP is attached by the provider via 1:1 NAT and is not visible to the OS. Do **not** use that address for public DNS.
+> **On K3s (single VM), the gateway answers on the node's own IP**, not a public address. K3s's built-in load balancer (ServiceLB) assigns the node address, and on a cloud VM that is the **internal/private** IP: the public IP is attached by the provider via 1:1 NAT and is not visible to the OS. Do **not** use that address for public DNS.
 
 Instead, use the machine's **public IP** (from your cloud provider) and open inbound `tcp:443` (the application) and `tcp:80`. Port 80 is used **only** by Let's Encrypt for the HTTP-01 certificate challenge — nothing else serves on it, so it is needed only with the `letsencrypt` / `letsencrypt-staging` issuer. Note that IP — you need it for DNS in the next step.
 
@@ -207,18 +212,18 @@ Instead, use the machine's **public IP** (from your cloud provider) and open inb
 
 ### Step 1.3 — Create a DNS record
 
-Create an A record pointing your chosen hostname to the ingress LoadBalancer IP:
+Create an A record pointing your chosen hostname to the gateway's IP:
 
 ```
-plextrac.mycompany.com  →  <your ingress IP from Step 1.2>
+plextrac.mycompany.com  ->  <the IP from Step 1.2>
 ```
 
-> Use the IP Step 1.2 told you to use: on **K3s / single VM** that's the machine's **public** IP (the `EXTERNAL-IP` from `kubectl get svc` is the node's private address); on **GKE/AKS/EKS** it's the LoadBalancer `EXTERNAL-IP`.
+> Use the IP Step 1.2 told you to use: on **K3s / single VM** that's the machine's **public** IP (the `EXTERNAL-IP` from `kubectl get svc` is the node's private address); on **GKE/AKS/EKS** it's the gateway's `EXTERNAL-IP` (after Phase 4).
 
 For local/lab installs without DNS, add an entry to `/etc/hosts` on any machine that needs to reach PlexTrac:
 
 ```
-<your ingress IP from Step 1.2>  plextrac.mycompany.com
+<the IP from Step 1.2>  plextrac.mycompany.com
 ```
 
 > DNS propagation can take minutes to hours depending on your provider. You can proceed with configuration while waiting, but the final smoke test requires DNS to resolve.
@@ -288,7 +293,7 @@ Decide which TLS option you will use before configuring values. Full details are
 | cert-manager — self-signed (`selfSigned`) | Local machine / local k3s / dev | cert-manager installed (browser warnings expected) |
 | Pre-create TLS secret | Bring-your-own or internal-CA certs | Your PEM files |
 | Inline cert in values | Lab/testing only | Your PEM files (ends up in Helm history) |
-| No TLS | Dev/testing only | Nothing |
+| No TLS (ingress-nginx only) | Dev/testing only | Nothing |
 
 If using cert-manager (either option), install it now:
 
@@ -298,9 +303,13 @@ helm repo update
 helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
+  --version v1.21.3 \
   --set crds.enabled=true \
+  --set config.gatewayAPI.enabled=true \
   --wait
 ```
+
+`config.gatewayAPI.enabled` lets cert-manager answer Let's Encrypt challenges through the gateway. cert-manager only looks for the Gateway API CRDs when it starts, so install it after Step 1.2, or run `kubectl -n cert-manager rollout restart deployment cert-manager` afterwards.
 
 The chart creates the Issuer for you — you do **not** need to hand-write a `ClusterIssuer`. Just set `global.ingress.certManager.issuer` in [Phase 3](#phase-3--configure-your-values-file):
 
@@ -325,11 +334,14 @@ Edit `my-values.yaml`. At minimum, set these fields using the values you gathere
 ```yaml
 global:
   ingress:
+    enabled: false                            # no ingress-nginx Ingresses
     host: plextrac.mycompany.com              # from Step 1.3
     tlsSecretName: internal-tls
     certManager:
-      issuer: letsencrypt          # public install. Use "selfSigned" for local, or "" to disable / BYO
+      issuer: letsencrypt          # public install. Use "selfSigned" for local, or "" with your own Secret (Option B)
       email: admin@mycompany.com   # required for letsencrypt / letsencrypt-staging
+  gateway:
+    enabled: true                             # Gateway API routing (Step 1.2)
 
 secrets:
   mode: manual
@@ -489,13 +501,14 @@ kubectl -n plextrac get secrets
 
 You should see at minimum `application-secrets` and `shared-secrets` (in `manual` mode).
 
-### Check ingress
+### Check routing
 
 ```bash
-kubectl -n plextrac get ingress
+kubectl -n plextrac get gateway plextrac   # PROGRAMMED True; ADDRESS is the node IP (K3s) or load balancer IP
+kubectl -n plextrac get httproute
 ```
 
-The `ADDRESS` field is populated once the ingress controller assigns an IP.
+On an install that still uses ingress-nginx, check `kubectl -n plextrac get ingress` instead: its `ADDRESS` field is populated once the controller assigns an IP.
 
 ### Smoke test
 
@@ -648,7 +661,7 @@ kubectl get storageclass
 
 ### Option A — cert-manager (recommended)
 
-The chart creates a namespaced `Issuer` for you and wires it to the ingress. Pick it with `global.ingress.certManager.issuer`:
+The chart creates a namespaced `Issuer` for you and wires it to the gateway (or the Ingresses). Pick it with `global.ingress.certManager.issuer`:
 
 ```yaml
 global:
@@ -663,9 +676,9 @@ global:
       email: admin@mycompany.com   # required for letsencrypt / letsencrypt-staging
 ```
 
-`letsencrypt`/`letsencrypt-staging` use the ACME **HTTP-01** challenge, so your host must resolve publicly to the ingress IP with inbound `:80` reachable. For internal hosts that can't meet that, use `selfSigned` (or Option B with an internal-CA cert).
+`letsencrypt`/`letsencrypt-staging` use the ACME **HTTP-01** challenge, so your host must resolve publicly to the gateway's IP with inbound `:80` reachable. With Gateway API the chart creates the cert-manager `Certificate` objects itself, and cert-manager answers the challenge through the gateway (it needs `config.gatewayAPI.enabled`, Phase 2.4). For internal hosts that can't meet that, use `selfSigned` (or Option B with an internal-CA cert).
 
-**Bring your own issuer:** leave `certManager.issuer: ""` and point `certManagerClusterIssuer` at an `Issuer`/`ClusterIssuer` you created yourself — any solver (DNS-01, a private CA, Vault, etc.):
+**Bring your own issuer:** leave `certManager.issuer: ""` and point `certManagerClusterIssuer` at a `ClusterIssuer` you created yourself, with any solver (DNS-01, a private CA, Vault, etc.). An HTTP-01 solver needs a `gatewayHTTPRoute` with `parentRefs` set to the `plextrac` Gateway (namespace `plextrac`, `sectionName: http`).
 
 ```yaml
 global:
@@ -724,6 +737,8 @@ In `externalSecrets` mode, enable `secrets.externalSecrets.tls` and point its `r
 ### Option D — No managed certificate (dev/testing only)
 
 > **The chart does not support true plaintext-only HTTP today.** The ingress always renders a `tls:` block referencing `global.ingress.tlsSecretName`, regardless of these settings.
+
+**ingress-nginx only.** With Gateway API there is no default certificate, so HTTPS fails until the Secret exists: use `selfSigned` (Option A) for throwaway installs instead.
 
 Leave `certManager.issuer` and `certManagerClusterIssuer` blank and set `tls.enabled: false`. No TLS secret is created, so **ingress-nginx serves its own default self-signed certificate** for the host (browsers warn; there is no plaintext path). Use Option A/B/C/E for a real cert — this is only for throwaway dev where a self-signed warning is acceptable.
 
@@ -984,8 +999,8 @@ keycloak:
     dedicated: false
 ```
 
-- **Browser-facing:** unlike Synqly, Keycloak needs an externally reachable URL for SSO login redirects, so the chart creates its **own ingress** at `keycloak.host` with a `keycloak-tls` secret. `keycloak.host` is required — the chart fails fast without it.
-- **DNS:** `keycloak.host` must resolve to the **same ingress endpoint as the main app host** (on single-node k3s, the node's IP). The ingress-nginx controller routes to Keycloak by `Host` header — traffic does not pass through the app's `plextracnginx`. If you use cert-manager with an ACME (letsencrypt) issuer, this DNS record must exist and be publicly resolvable *before* install, or the HTTP-01 challenge for `keycloak-tls` will fail.
+- **Browser-facing:** unlike Synqly, Keycloak needs an externally reachable URL for SSO login redirects, so the chart gives it **its own route** at `keycloak.host` (a separate HTTPS listener on the Gateway, or its own Ingress) with a `keycloak-tls` secret. Plain-HTTP requests to it are redirected to HTTPS. `keycloak.host` is required; the chart fails fast without it.
+- **DNS:** `keycloak.host` must resolve to the **same endpoint as the main app host** (on single-node k3s, the node's IP). The gateway (or ingress-nginx) routes to Keycloak by host; traffic does not pass through the app's `plextracnginx`. If you use cert-manager with an ACME (letsencrypt) issuer, this DNS record must exist and be publicly resolvable *before* install, or the HTTP-01 challenge for `keycloak-tls` will fail.
 - **TLS:** three ways to provide `keycloak-tls` — cert-manager (`certManager.issuer`), bring-your-own issuer (`certManagerClusterIssuer`), or a pre-created secret (leave both blank).
 - **Realm/OIDC provisioning is external:** the chart does **not** create realms/clients. It generates `keycloak-oidc-secret` (broker client secret, tenant-realm-admin secret, RSA key); your **realm-provisioning migration Job** consumes it to configure the Keycloak clients, and the PlexTrac app reads the same secret — so all three stay in sync.
 - **Database:** `dedicated: false` creates a `keycloak` DB + `keycloak_admin` user in the bundled Postgres; `dedicated: true` deploys a separate `keycloak-postgres`.
@@ -1009,8 +1024,8 @@ keycloak:
 ```
 
 - **Requires Keycloak:** MCP consumes `keycloak-oidc-secret` (the `tenantRealmAdminClientSecret`) and the `KEYCLOAK_*_BASE_URL` values, so `keycloak.enabled` must be `true`. The chart fails fast otherwise.
-- **Routing:** unlike Keycloak, MCP is **not** a separate hostname — it's served at the path **`/mcp`** on your main app host (`global.ingress.host`) and shares that host's TLS certificate (provided by the app's ingress). No extra DNS record or cert is needed.
-- **Networking:** ClusterIP `mcp` on port 8000; the ingress adds CORS and long-lived-connection timeouts for MCP clients, and blocks the `/mcp/metrics` path from the public route.
+- **Routing:** unlike Keycloak, MCP is **not** a separate hostname: it's served at the path **`/mcp`** on your main app host (`global.ingress.host`) and shares that host's TLS certificate. No extra DNS record or cert is needed.
+- **Networking:** ClusterIP `mcp` on port 8000; the route adds CORS and long-lived-connection timeouts for MCP clients. The Gateway API route always blocks `/mcp/metrics`; on ingress-nginx that needs `mcp.blockMetricsPath: true`, which uses a snippet annotation.
 - **OpenTelemetry:** off by default (an on-prem cluster has no collector). To enable tracing, set `mcp.otel.enabled: true` and `mcp.otel.exporterEndpoint` to your OTLP gRPC receiver.
 - **Secrets:** reuses existing chart secrets — `JWT_KEY` (`application-secrets`), `LAUNCH_DARKLY_SDK_KEY` (`shared-secrets`), and the Keycloak client secret (`keycloak-oidc-secret`). Nothing new to provide.
 - **Images:** `images.mcp` (registry-agnostic, override `.registry` for your mirror); pulls use `global.imagePullSecrets` (add `mcp.imagePullSecrets` for mcp-only secrets — the two are merged and deduped).
@@ -1018,6 +1033,8 @@ keycloak:
 ---
 
 ## Upgrading
+
+> **Still on ingress-nginx?** Chart upgrades keep your Ingresses as they are (`global.ingress.enabled` defaults to `true`). ingress-nginx no longer gets security fixes; to move to Gateway API, follow [Migrate from ingress-nginx to Gateway API](runbooks/ingress-nginx_to_gateway-api.md).
 
 ```bash
 helm upgrade --install plextrac ./charts/plextrac \
@@ -1155,7 +1172,19 @@ kubectl patch configmap ingress-nginx-controller \
 helm lint ./charts/plextrac -f my-values.yaml
 ```
 
-### Ingress not routing traffic
+### Gateway not routing traffic
+
+```bash
+kubectl -n plextrac get gateway plextrac                  # PROGRAMMED True
+kubectl -n plextrac describe httproute                    # each parent Accepted and ResolvedRefs
+kubectl -n plextrac get pods -l gateway.networking.k8s.io/gateway-name=plextrac
+kubectl -n plextrac logs deploy/plextrac-istio --tail=100 # access log
+kubectl -n istio-system logs deploy/istiod --tail=100
+```
+
+If plain HTTP works but HTTPS does not, the TLS Secret is missing (`kubectl -n plextrac get secret internal-tls`): unlike ingress-nginx, the gateway has no fallback certificate.
+
+### Ingress not routing traffic (ingress-nginx)
 
 ```bash
 kubectl -n ingress-nginx get pods
@@ -1166,7 +1195,7 @@ kubectl -n ingress-nginx logs -l app.kubernetes.io/name=ingress-nginx --tail=100
 
 ### Uploads fail with `413 Request Entity Too Large`
 
-The request body is larger than the ingress allows. Every Ingress the chart creates sets `nginx.ingress.kubernetes.io/proxy-body-size` from `global.ingress.proxyBodySize` (default `100m`). Raise it in `my-values.yaml` and run `helm upgrade` with that file:
+On ingress-nginx, the request body is larger than the Ingress allows (the Istio gateway does not cap request bodies, so there a 413 comes from the application or something in front of the cluster). Every Ingress the chart creates sets `nginx.ingress.kubernetes.io/proxy-body-size` from `global.ingress.proxyBodySize` (default `100m`). Raise it in `my-values.yaml` and run `helm upgrade` with that file:
 
 ```yaml
 global:

@@ -10,6 +10,11 @@ Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostn
 > `imagePullPolicy: Always` on most containers, so every pod start tries to reach a registry
 > and fails without internet access.
 
+> **Routing:** this guide still installs ingress-nginx (its final release), and its values keep
+> the chart's Ingress routing. Connected installs now use Gateway API with Istio instead; an
+> air-gapped version of that setup is not covered here yet. Once Istio's images are on the node,
+> [this runbook](runbooks/ingress-nginx_to_gateway-api.md) moves an install over.
+
 ## How it works
 
 - K3s imports every image archive in `/var/lib/rancher/k3s/agent/images/` when it starts, and

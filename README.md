@@ -6,29 +6,36 @@ Helm chart for deploying the PlexTrac platform on Kubernetes. Supports self-host
 
 A successful install requires three things to be in place **before** running `helm upgrade --install`:
 
-1. **A running Kubernetes cluster** with NGINX Ingress Controller installed
-2. **A DNS record** pointing your hostname to the ingress LoadBalancer IP
+1. **A running Kubernetes cluster** with the Gateway API CRDs and Istio installed (step 2 below)
+2. **A DNS record** pointing your hostname to the cluster (on K3s, the server's IP)
 3. **Your credentials gathered** — at minimum a domain name
 
-See [docs/user-guide.md](docs/user-guide.md) for the full phased installation guide.
+See [docs/user-guide.md](docs/user-guide.md) for the full phased installation guide. Already running on ingress-nginx? See [docs/runbooks/ingress-nginx_to_gateway-api.md](docs/runbooks/ingress-nginx_to_gateway-api.md).
 
 ## Quick start (K3s)
 
 > Prerequisites on the host you run this from: **Helm 3.10+** and **`jq`** (required by the registry script in step 4 — `apt install jq` / `dnf install jq` / `brew install jq`). `kubectl` is bundled with K3s.
 
 ```bash
-# 1. Install K3s (disable Traefik — PlexTrac uses NGINX; write a non-root-readable kubeconfig)
+# 1. Install K3s (disable Traefik: PlexTrac's routing runs on Istio; write a non-root-readable kubeconfig)
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -
 # kubeconfig is now readable without sudo — point kubectl/helm at it directly:
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
 
-# 2. Install NGINX Ingress Controller
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace --wait
+# 2. Install Gateway API CRDs (K3s 1.37+ already has them), Istio and cert-manager. Run from the repo root.
+kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1 || \
+  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
+helm repo add istio https://blob.istio.io/istio-release/charts
+helm repo add jetstack https://charts.jetstack.io && helm repo update
+helm upgrade --install istio-base istio/base -n istio-system --create-namespace \
+  --version 1.31.4 --set defaultRevision=default --wait
+helm upgrade --install istiod istio/istiod -n istio-system --version 1.31.4 \
+  -f charts/plextrac/examples/istiod-values.yaml --wait
+helm upgrade --install cert-manager jetstack/cert-manager -n cert-manager --create-namespace \
+  --version v1.21.3 --set crds.enabled=true --set config.gatewayAPI.enabled=true --wait
 
-# 3. Get the ingress IP and create your DNS record (or /etc/hosts entry)
-kubectl -n ingress-nginx get svc ingress-nginx-controller
+# 3. Create your DNS record (or /etc/hosts entry): on K3s the gateway answers on the node IP
+kubectl get nodes -o wide
 
 # 4. Fill in credentials and create registry pull secrets
 cp .env.example .env.local
@@ -37,7 +44,7 @@ cp .env.example .env.local
 
 # 5. Configure your values file
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
-# Edit my-values.yaml — paste the snippet from step 4, set global.ingress.host
+# Edit my-values.yaml: paste the snippet from step 4, set global.ingress.host (TLS defaults to a selfSigned cert)
 
 # 6. Install (namespace was created by setup-registry-credentials.sh in step 4)
 helm upgrade --install plextrac ./charts/plextrac \
@@ -45,7 +52,8 @@ helm upgrade --install plextrac ./charts/plextrac \
   -f my-values.yaml \
   --wait --timeout 15m   # first install runs DB migrations inline; allow time
 
-# 7. Verify
+# 7. Verify (add -k while the certificate is selfSigned)
+kubectl -n plextrac get gateway plextrac   # PROGRAMMED True
 curl -I https://plextrac.mycompany.com/api/v2/health/full
 ```
 
@@ -73,6 +81,7 @@ kubectl -n plextrac delete pvc --all
 | `docs/PlexTrac_K3s_AirGapped_Installation_Guide.md` | K3s installation on a server without internet access |
 | `docs/runbooks/secrets-modes.md` | Detailed secrets configuration reference |
 | `docs/runbooks/docker-compose_to_k3s_guide.md` | docker-compose to k3s migration guide (on-prem) |
+| `docs/runbooks/ingress-nginx_to_gateway-api.md` | Move an existing install from ingress-nginx to Gateway API (Istio) |
 | `docs/migration/` | Kustomize → Helm migration guides |
 | `.github/workflows/` | CI and release automation |
 

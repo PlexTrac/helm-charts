@@ -27,6 +27,7 @@
         "ingress": {
           "type": "object",
           "properties": {
+            "enabled": { "type": "boolean" },
             "host": { "type": "string" },
             "tlsSecretName": { "type": "string", "minLength": 1 },
             "certManager": {
@@ -38,6 +39,14 @@
             },
             "certManagerClusterIssuer": { "type": "string" },
             "proxyBodySize": { "type": "string", "pattern": "^([0-9]+[kKmMgG]?)?$" }
+          }
+        },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "className": { "type": "string", "minLength": 1 },
+            "serviceType": { "type": "string", "enum": ["LoadBalancer", "ClusterIP", "NodePort"] }
           }
         }
       },

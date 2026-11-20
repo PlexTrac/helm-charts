@@ -1,3 +1,4 @@
+{{- if .Values.global.ingress.enabled }}
 {{- $cm := .Values.global.ingress.certManager | default dict -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -44,3 +45,4 @@ spec:
   - hosts:
     - {{ include "plextrac.ingressHost" . }}
     secretName: {{ include "plextrac.ingressTlsSecretName" . }}
+{{- end }}

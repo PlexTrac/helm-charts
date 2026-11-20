@@ -1,0 +1,48 @@
+# Values for Istio's istiod chart (not the plextrac chart), for global.gateway.enabled.
+# Istio runs only as the Gateway API implementation for PlexTrac's Gateway and HTTPRoutes: no
+# sidecars, no mesh. istiod deploys the gateway proxy (plextrac-istio) into the plextrac namespace.
+#
+#   helm upgrade --install istiod istio/istiod -n istio-system --version <version> \
+#     -f charts/plextrac/examples/istiod-values.yaml --wait
+
+# Single-node installs. The chart default asks for 500m CPU / 2Gi and an autoscaler.
+autoscaleEnabled: false
+replicaCount: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+env:
+  # Keep the Gateway's Helm labels and annotations off the Deployment and Service istiod generates.
+  PILOT_ENABLE_GATEWAY_API_COPY_LABELS_ANNOTATIONS: "false"
+
+global:
+  # Gateway proxy (plextrac-istio). The chart default request is 100m / 128Mi.
+  proxy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  # Private registry or mirror: istiod and the gateway proxy pull <hub>/pilot and <hub>/proxyv2,
+  # tagged with the chart version. The pull secret must exist in istio-system and plextrac.
+  # hub: registry.mycompany.com/istio
+  # imagePullSecrets:
+  #   - internal-registry-creds
+
+meshConfig:
+  # istiod also has a Kubernetes Ingress controller. Keep it off so it never acts on the
+  # nginx-class Ingresses that stay in place during a migration.
+  ingressControllerMode: "OFF"
+  # Gateway access logs on stdout, like ingress-nginx.
+  accessLogFile: /dev/stdout
+  defaultConfig:
+    proxyHeaders:
+      # Don't send "server: istio-envoy" or x-envoy-* timing headers to clients.
+      server:
+        disabled: true
+      envoyDebugHeaders:
+        disabled: true
+      # The backends are not in a mesh: don't send them Istio peer-metadata headers.
+      metadataExchangeHeaders:
+        mode: IN_MESH

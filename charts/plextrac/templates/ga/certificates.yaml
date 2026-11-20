@@ -1,0 +1,64 @@
+{{- /*
+cert-manager Certificates for Gateway API mode without Ingresses (global.gateway.enabled and not
+global.ingress.enabled). While the Ingresses are rendered, their cert-manager.io annotations keep
+owning the TLS Secrets, exactly as before; cert-manager has no annotation equivalent for a Gateway
+listener without a hostname.
+
+The names differ from the Secret names on purpose: the Certificates cert-manager created from the
+Ingress annotations are named after the Secrets, and Helm refuses to take over an object it did
+not create. Those are deleted with their Ingress; the Secrets are kept and keep serving until
+these Certificates have renewed them.
+*/ -}}
+{{- if and .Values.global.gateway.enabled (not .Values.global.ingress.enabled) }}
+{{- $cm := .Values.global.ingress.certManager | default dict -}}
+{{- if or $cm.issuer .Values.global.ingress.certManagerClusterIssuer }}
+{{- $secret := include "plextrac.ingressTlsSecretName" . }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-cert" $secret | trunc 63 | trimSuffix "-" }}
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  secretName: {{ $secret }}
+  dnsNames:
+    - {{ include "plextrac.ingressHost" . | quote }}
+  issuerRef:
+    group: cert-manager.io
+{{- if $cm.issuer }}
+    kind: Issuer
+    name: plextrac-issuer
+{{- else }}
+    kind: ClusterIssuer
+    name: {{ .Values.global.ingress.certManagerClusterIssuer | quote }}
+{{- end }}
+{{- end }}
+{{- if .Values.keycloak.enabled }}
+{{- $kcm := .Values.keycloak.certManager | default dict -}}
+{{- if or $kcm.issuer .Values.keycloak.certManagerClusterIssuer }}
+{{- $kcSecret := include "plextrac.keycloakTlsSecretName" . }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-cert" $kcSecret | trunc 63 | trimSuffix "-" }}
+  namespace: {{ include "plextrac.namespace" . }}
+  labels:
+    {{- include "plextrac.commonLabels" . | nindent 4 }}
+spec:
+  secretName: {{ $kcSecret }}
+  dnsNames:
+    - {{ .Values.keycloak.host | quote }}
+  issuerRef:
+    group: cert-manager.io
+{{- if $kcm.issuer }}
+    kind: Issuer
+    name: keycloak-issuer
+{{- else }}
+    kind: ClusterIssuer
+    name: {{ .Values.keycloak.certManagerClusterIssuer | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

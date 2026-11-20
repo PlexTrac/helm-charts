@@ -2,6 +2,8 @@
 
 > For a server without internet access, use the [K3s air-gapped installation guide](PlexTrac_K3s_AirGapped_Installation_Guide.md) instead.
 
+> Already running PlexTrac with ingress-nginx? Move it to Gateway API with the [migration runbook](runbooks/ingress-nginx_to_gateway-api.md).
+
 ## Prerequisites
 
 Update your system packages:
@@ -12,7 +14,7 @@ sudo apt update
 
 ## 1. Install K3s
 
-Install K3s with Traefik disabled (PlexTrac uses NGINX) and make kubeconfig readable without sudo:
+Install K3s with Traefik disabled (PlexTrac's routing runs on Istio, and Traefik would hold ports 80/443) and make kubeconfig readable without sudo:
 
 ```shell
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik --write-kubeconfig-mode 644" sh -
@@ -39,30 +41,43 @@ Verify the installation:
 helm version
 ```
 
-## 3. Install NGINX Ingress Controller
-
-Add the NGINX Helm repository and install the ingress controller:
-
-```shell
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace --wait
-```
-
-Get the ingress IP (create a DNS record or `/etc/hosts` entry with this IP):
-
-```shell
-kubectl -n ingress-nginx get svc ingress-nginx-controller
-```
-
-## 4. Clone PlexTrac Helm Charts
+## 3. Clone PlexTrac Helm Charts
 
 ```shell
 git clone https://github.com/PlexTrac/helm-charts.git
 cd helm-charts
 ```
+
+## 4. Install Gateway API, Istio and cert-manager
+
+PlexTrac's routing uses the Kubernetes Gateway API, served by Istio. Install the Gateway API CRDs (K3s 1.37 and newer already has them):
+
+```shell
+kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1 || \
+  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
+```
+
+Install Istio as the Gateway API controller only (no service mesh):
+
+```shell
+helm repo add istio https://blob.istio.io/istio-release/charts
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+helm upgrade --install istio-base istio/base -n istio-system --create-namespace \
+  --version 1.31.4 --set defaultRevision=default --wait
+helm upgrade --install istiod istio/istiod -n istio-system --version 1.31.4 \
+  -f charts/plextrac/examples/istiod-values.yaml --wait
+```
+
+Install cert-manager, which issues the TLS certificate. Gateway API support lets it answer Let's Encrypt challenges through the gateway:
+
+```shell
+helm upgrade --install cert-manager jetstack/cert-manager -n cert-manager --create-namespace \
+  --version v1.21.3 --set crds.enabled=true --set config.gatewayAPI.enabled=true --wait
+```
+
+PlexTrac answers on the server's IP once installed: the gateway's Service uses K3s's built-in load balancer. Create a DNS record or `/etc/hosts` entry for your domain pointing at the server's IP (its public IP on a cloud VM).
 
 ## 5. Configure Registry Credentials
 
@@ -97,138 +112,39 @@ Copy the example values file:
 cp charts/plextrac/examples/values-self-hosted.yaml my-values.yaml
 ```
 
-Edit `my-values.yaml` and set the following, ensuring you uncomment the `imagePullSecrets` on lines 10-12, set the domain on line 16, and input the CKE License Key on line 35:
+Edit `my-values.yaml` and set:
+
+- `global.imagePullSecrets`: the snippet printed in step 5 (uncomment `ckeditor-registry-creds` if you set CKEditor credentials).
+- `global.ingress.host`: your domain.
+- `global.ingress.certManager.issuer`: `selfSigned` works without DNS or a public IP (browsers warn); `letsencrypt` gives a trusted certificate for a public domain (also set `email`, and open port 80). Or set `""` and create the `internal-tls` Secret yourself with `kubectl -n plextrac create secret tls internal-tls --cert=fullchain.pem --key=privkey.pem`.
+- `CKEDITOR_SERVER_LICENSE_KEY`: your CKEditor license key.
+
+The example already turns on Gateway API routing (`global.gateway.enabled: true`) and turns off the ingress-nginx Ingresses (`global.ingress.enabled: false`). The relevant part of the file:
 
 ```yaml
-# Self-hosted PlexTrac deployment using manual secrets (recommended for most customers)
-# Secrets are auto-generated on first install and preserved on upgrade.
-# Set global.ingress.host to your domain before installing.
-
 global:
-  namespace: plextrac
-  createNamespace: true
-  # Run scripts/setup-registry-credentials.sh to create the image pull secret, then
-  # reference it here. Leave empty only if all images are from public registries.
   imagePullSecrets:
     - name: internal-registry-creds
-    - name: ckeditor-registry-creds   # uncomment if CKEditor credentials were provided
-  # image:
-  #   registry: ""   # set to your registry/mirror to re-home all images except ckeditor
+    - name: ckeditor-registry-creds   # if CKEditor credentials were provided
   ingress:
-    host: plextrac.local   # Required: set to your actual domain
-    tlsSecretName: plextrac-com-tls
-    # TLS via cert-manager (cert-manager must be installed). Pick an issuer:
-    #   letsencrypt / letsencrypt-staging = public-facing (also set email); selfSigned = local/dev
+    enabled: false
+    host: plextrac.mycompany.com      # your domain
+    tlsSecretName: internal-tls
     certManager:
-      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
-      email: ""      # required for letsencrypt / letsencrypt-staging
-    certManagerClusterIssuer: ""   # used only when certManager.issuer is "" (your own issuer's name)
+      issuer: selfSigned              # or letsencrypt (+ email), or "" with your own Secret
+      email: ""
+  gateway:
+    enabled: true
 
 secrets:
-  mode: manual
   manual:
-    createKubernetesSecrets: true
     generatedSecrets:
-      application:
-        stringData:
-          ADMIN_EMAIL: ""   # Optional: admin notification email
       shared:
         stringData:
-          CKEDITOR_SERVER_LICENSE_KEY: "Add Key"   # Required if using CKEditor; leave empty to disable
-          LAUNCH_DARKLY_SDK_KEY: ""
-          PENDO_API_KEY: ""
-          SENTRY_DSN_BACKEND: ""
-      tls:
-        enabled: false   # Set to true and provide crt/key to manage TLS via Helm
-        # crt: |
-        #   -----BEGIN CERTIFICATE-----
-        #   ...
-        # key: |
-        #   -----BEGIN PRIVATE KEY-----
-        #   ...
-
-images:
-  backend:
-    repository: plextrac/plextracapi
-    tag: stable
-  nginx:
-    repository: plextrac/plextracnginx
-    tag: stable
-  ckeditor:
-    registry: docker.cke-cs.com
-    repository: cs
-    tag: latest
-  plextracdb:
-    repository: plextrac/plextracdb
-    tag: 7.2.0
-  postgres:
-    repository: plextrac/plextracpostgres
-    tag: stable
-  redis:
-    repository: redis
-    tag: 8.4.0-alpine
-  redisExporter:
-    repository: oliver006/redis_exporter
-    tag: latest
-  minio:
-    repository: plextrac/minio
-    tag: latest
-  minioBootstrap:
-    repository: plextrac/plextrac-minio-bootstrap
-    tag: stable
-  synqly:
-    repository: plextrac/plextrac-synqly-embedded
-    tag: latest
-  keycloak:
-    repository: plextrac/plextrac-keycloak
-    tag: stable
-  # keycloakSetup:                            # optional; defaults to the backend image (contains the CLI). Set for a lean build.
-  #   repository: plextrac/plextracapi-keycloak-setup
-  #   tag: stable
-  mcp:
-    repository: plextrac/mcp
-    tag: stable
-
-replicaCounts:
-  plextracapi: 3
-  ckeditor: 3
-  eventOrchestrator: 1
-  notificationEngine: 1
-  notificationSender: 1
-  integrationWorker: 1
-  contextualScoringService: 1
-  datalakeMaintainer: 0   # Disabled by default; set to 1 to enable
-
-# Optional in-cluster Synqly integration service (disabled by default).
-# Runs internal-only; PlexTrac is wired to it automatically. See docs/user-guide.md.
-# synqly:
-#   enabled: true
-#   database:
-#     dedicated: false   # reuse bundled Postgres; true = chart deploys a dedicated one
-
-# Optional in-cluster Keycloak OIDC/SSO broker (disabled by default). Browser-facing: needs its own
-# hostname + TLS, and a custom backend image with the on-prem realm migration. See docs/user-guide.md.
-# keycloak:
-#   enabled: true
-#   host: auth.mycompany.com          # REQUIRED — browser-facing auth hostname
-#   certManager:
-#     issuer: letsencrypt             # selfSigned | letsencrypt | letsencrypt-staging | "" (BYO / pre-created)
-#     email: admin@mycompany.com
-#   database:
-#     dedicated: false                # reuse bundled Postgres; true = chart deploys a dedicated one
-
-# Optional in-cluster MCP (Model Context Protocol) server (disabled by default).
-# REQUIRES keycloak.enabled. Served at /mcp on the app host. See docs/user-guide.md.
-# mcp:
-#   enabled: true
-#   otel:
-#     enabled: false          # set true + exporterEndpoint for your OTLP collector
-
-# Extra non-secret env vars injected into the env-config ConfigMap (see the chart's values.yaml).
-# extraEnv:
-#   SOME_FEATURE_FLAG: "true"
-#   CUSTOM_TIMEOUT_MS: "30000"
+          CKEDITOR_SERVER_LICENSE_KEY: "your-license-key"
 ```
+
+Optional components (Synqly, Keycloak, MCP) are commented out at the end of the file; see the [user guide](user-guide.md).
 
 ## 7. Install PlexTrac
 
@@ -248,9 +164,11 @@ First installation runs database migrations inline; allow time for completion. D
 
 ## 8. Verify Installation
 
-Check the API health endpoint:
+Check that the gateway is programmed and has the server's IP, then call the API health endpoint (add `-k` with a `selfSigned` certificate):
 
 ```shell
+kubectl -n plextrac get gateway plextrac   # PROGRAMMED True
+kubectl -n plextrac get httproute
 curl -I https://[your_plextrac_domain]/api/v2/health/full
 ```
 
@@ -272,7 +190,7 @@ If the above does not work (link in the log has expired or the token itself has 
 
 **Key Points:**
 
-- Traefik is disabled; NGINX Ingress Controller is used instead
+- Traefik is disabled; routing runs through the Gateway API, served by Istio
 - Kubeconfig is readable without sudo (`--write-kubeconfig-mode 644`)
 - First Helm installation requires extra time for database migrations (`--timeout 15m`)
 - All registry credentials must be set before installation

@@ -14,15 +14,20 @@ global:
   #   registry: ""   # set to your registry/mirror to re-home all images except ckeditor
   #   pullPolicy: "" # IfNotPresent for air-gapped installs (images pre-loaded on the node)
   ingress:
+    enabled: false                 # Ingress objects for ingress-nginx; new installs use the gateway below
     host: plextrac.mycompany.com   # Required: set to your actual domain
     tlsSecretName: internal-tls
-    # TLS via cert-manager (cert-manager must be installed). Pick an issuer:
+    # TLS. The gateway needs a certificate, so pick a cert-manager issuer (cert-manager must be
+    # installed), or set issuer: "" and create the tlsSecretName Secret yourself.
     #   letsencrypt / letsencrypt-staging = public-facing (also set email); selfSigned = local/dev
     certManager:
-      issuer: ""     # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (none / bring-your-own)
+      issuer: selfSigned   # "letsencrypt" | "letsencrypt-staging" | "selfSigned" | "" (bring-your-own)
       email: ""      # required for letsencrypt / letsencrypt-staging
     certManagerClusterIssuer: ""   # used only when certManager.issuer is "" (your own issuer's name)
-    proxyBodySize: 100m   # max upload size on every Ingress; "0" = no limit, "" = controller default (1m)
+    proxyBodySize: 100m   # ingress-nginx only: max upload size; "0" = no limit, "" = controller default (1m)
+  # Gateway API routing, served by Istio. Install the Gateway API CRDs and Istio first (docs/user-guide.md).
+  gateway:
+    enabled: true
 
 secrets:
   mode: manual

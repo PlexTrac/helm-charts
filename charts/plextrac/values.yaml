@@ -13,7 +13,13 @@ global:
     # Set IfNotPresent for air-gapped installs, where images are pre-loaded onto the node and
     # no registry is reachable (docs/PlexTrac_K3s_AirGapped_Installation_Guide.md).
     pullPolicy: ""
+  # Routing. host, tlsSecretName and the cert-manager settings below apply to both routing modes:
+  #   ingress.enabled  -> Ingress objects for ingress-nginx (ingressClassName: nginx). Retired
+  #                       upstream in March 2026; kept so existing installs upgrade unchanged.
+  #   gateway.enabled  -> Gateway API objects for Istio (recommended for new installs).
+  # Both can be on at once while migrating (docs/runbooks/ingress-nginx_to_gateway-api.md).
   ingress:
+    enabled: true
     host: ""
     tlsSecretName: internal-tls
     # cert-manager integration — choose how the TLS certificate is issued.
@@ -30,7 +36,21 @@ global:
     # nginx.ingress.kubernetes.io/proxy-body-size annotation. Larger requests get HTTP 413.
     # A number with an optional k/m/g suffix (512k, 100m, 1g). "0" (quoted) removes the limit.
     # "" omits the annotation so the controller's default applies (1m unless set in its ConfigMap).
+    # ingress-nginx only: the Istio gateway does not cap request bodies.
     proxyBodySize: 100m
+  # Gateway API routing, served by Istio (install Istio and the Gateway API CRDs first). Renders a
+  # Gateway named "plextrac" and one HTTPRoute per Ingress; istiod then deploys the gateway proxy
+  # (Deployment and Service "plextrac-istio" in this namespace). A TLS Secret is required: unlike
+  # ingress-nginx there is no built-in default certificate. With certManager set and the Ingresses
+  # off, the chart creates the cert-manager Certificates itself.
+  gateway:
+    enabled: false
+    # GatewayClass. Istio is the supported implementation; its X-Real-IP header and Service
+    # settings below are Istio/Envoy-specific.
+    className: istio
+    # Service type of the gateway proxy. LoadBalancer takes ports 80/443 (on K3s, the node IP via
+    # ServiceLB). ClusterIP keeps the gateway unexposed while ingress-nginx still serves traffic.
+    serviceType: LoadBalancer
 
 storage:
   storageClassName: local-path   # K3s default. For GKE use "standard" or "premium-rwo"; AKS use "default" or "managed-premium"; EKS use "gp2" or "gp3"
@@ -426,6 +446,7 @@ mcp:
   # REQUIRES the ingress-nginx controller to allow snippet annotations (allow-snippet-annotations:
   # true) — otherwise the admission webhook rejects the Ingress. Off by default because current
   # ingress-nginx disables snippets. MCP metrics are scraped in-cluster on port 8000 regardless.
+  # The Gateway API route (global.gateway.enabled) always blocks the path; this only affects the Ingress.
   blockMetricsPath: false
   # OpenTelemetry is off by default (on-prem has no collector). To enable, set otel.enabled=true
   # and point otel.exporterEndpoint at your OTLP gRPC receiver.
