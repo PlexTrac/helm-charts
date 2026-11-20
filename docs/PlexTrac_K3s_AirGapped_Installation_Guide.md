@@ -26,7 +26,7 @@ Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostn
 
 | Component | Version | Notes |
 |---|---|---|
-| K3s | `v1.35.9+k3s1` | Kubernetes 1.35, the newest minor the final ingress-nginx release supports |
+| K3s | `v1.35.10+k3s1` | Kubernetes 1.35, the newest minor the final ingress-nginx release supports |
 | ingress-nginx chart | `4.15.1` (controller `v1.15.1`) | Final release: the project was [retired upstream](https://www.kubernetes.dev/blog/2025/11/12/ingress-nginx-retirement/) in March 2026. Supports Kubernetes 1.31 to 1.35 |
 | Helm | `v3.22.0` | Helm 3, as used by this chart's CI. Helm 3 security fixes end February 10, 2027 |
 | k3s-selinux | `1.6-1.el9` (release `v1.6.stable.1`) | SELinux policy for K3s on RHEL 9 |
@@ -68,7 +68,7 @@ versions ingress-nginx 1.15 supports.
 ### 1.1 Set versions
 
 ```bash
-export K3S_VERSION="v1.35.9+k3s1"
+export K3S_VERSION="v1.35.10+k3s1"
 export INGRESS_NGINX_VERSION="4.15.1"
 export HELM_VERSION="v3.22.0"
 export K3S_SELINUX_RELEASE="v1.6.stable.1"
@@ -700,7 +700,8 @@ Follow it with `sudo journalctl -u k3s -f`.
 
 ### K3s fails to start and mentions the node IP or a default route
 
-The server has no default route. See **Default route** in step 2.2.
+The server has no default route. See **Default route** in step 2.2. K3s waits up to 60 seconds
+for one before it exits with `no default routes found`, so the error can take a minute to appear.
 
 ### Only one plextracapi pod can read uploads
 
