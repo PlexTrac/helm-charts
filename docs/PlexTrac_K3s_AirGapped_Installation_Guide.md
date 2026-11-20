@@ -6,14 +6,17 @@ from local files. No container registry is needed inside the air gap.
 
 Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostname.
 
-> **Requires PlexTrac chart 2.29.0 or later.** Earlier chart versions hardcode
-> `imagePullPolicy: Always` on most containers, so every pod start tries to reach a registry
-> and fails without internet access.
+> **Requires PlexTrac chart 2.30.0 or later**, for Gateway API routing. Chart versions before
+> 2.29.0 also hardcode `imagePullPolicy: Always` on most containers, so every pod start tries to
+> reach a registry and fails without internet access.
 
-> **Routing:** this guide still installs ingress-nginx (its final release), and its values keep
-> the chart's Ingress routing. Connected installs now use Gateway API with Istio instead; an
-> air-gapped version of that setup is not covered here yet. Once Istio's images are on the node,
-> [this runbook](runbooks/ingress-nginx_to_gateway-api.md) moves an install over.
+> **Installed with an earlier version of this guide?** It routed through ingress-nginx, which
+> keeps working after upgrades: the chart keeps its Ingresses unless you turn them off. To move
+> to Gateway API, transfer Istio's charts and images (steps 1.3 to 1.6) and `standard-install.yaml`
+> from [Gateway API v1.6.3](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.3)
+> (K3s 1.35, which that version installed, does not include the Gateway API CRDs). Then follow
+> the [migration runbook](runbooks/ingress-nginx_to_gateway-api.md), using those local files
+> instead of the Helm repositories and download URLs.
 
 ## How it works
 
@@ -24,6 +27,9 @@ Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostn
   on the node instead of contacting a registry.
 - The image list is rendered from your own values file, so the bundle contains exactly the
   images your configuration uses, including any optional components you enable.
+- Routing uses the Kubernetes Gateway API, served by Istio as a gateway only (no service mesh).
+  K3s installs the Gateway API CRDs itself, and Istio's two images go into the bundle with
+  PlexTrac's.
 - TLS uses a certificate you supply, ideally from your internal CA. cert-manager and
   Let's Encrypt are not used.
 
@@ -31,13 +37,22 @@ Throughout this guide, replace `plextrac.mycompany.com` with your PlexTrac hostn
 
 | Component | Version | Notes |
 |---|---|---|
-| K3s | `v1.35.9+k3s1` | Kubernetes 1.35, the newest minor the final ingress-nginx release supports |
-| ingress-nginx chart | `4.15.1` (controller `v1.15.1`) | Final release: the project was [retired upstream](https://www.kubernetes.dev/blog/2025/11/12/ingress-nginx-retirement/) in March 2026. Supports Kubernetes 1.31 to 1.35 |
+| K3s | `v1.37.2+k3s1` | Kubernetes 1.37. From 1.37 on, K3s installs the Gateway API CRDs (v1.6.3) itself |
+| Istio (`base` and `istiod` charts) | `1.31.4` | Gateway API controller only, as in connected installs. Supported until about March 2027 |
 | Helm | `v3.22.0` | Helm 3, as used by this chart's CI. Helm 3 security fixes end February 10, 2027 |
 | k3s-selinux | `1.6-1.el9` (release `v1.6.stable.1`) | SELinux policy for K3s on RHEL 9 |
 
-Newer patch releases are fine. If you change the K3s minor version, stay within the Kubernetes
-versions ingress-nginx 1.15 supports.
+Kubernetes 1.37 is the newest minor that Istio 1.31 supports: Istio's
+[support table](https://istio.io/latest/docs/releases/supported-releases/) lists 1.32 to 1.37.
+The [Istio 1.31.0 announcement](https://istio.io/latest/news/releases/1.31.x/announcing-1.31/),
+published the day after Kubernetes 1.37.0, still says 1.32 to 1.36. Helm 3.22 supports
+Kubernetes 1.34 to 1.37 ([Helm version skew](https://helm.sh/docs/v3/topics/version_skew/)).
+
+Newer patch releases are fine. If you change the K3s minor version, stay within Kubernetes 1.34
+to 1.37. K3s releases before 1.37 do not install the Gateway API CRDs: add `standard-install.yaml`
+from [Gateway API v1.6.3](https://github.com/kubernetes-sigs/gateway-api/releases/tag/v1.6.3) to
+the bundle, and apply it with `kubectl apply --server-side -f standard-install.yaml` before you
+install Istio in step 2.6.
 
 ## Requirements
 
@@ -46,8 +61,8 @@ versions ingress-nginx 1.15 supports.
 - x86_64 Linux with Docker or Podman, `git`, `curl`, `sha256sum`, and Helm 3.10 or newer
   ([Install Helm](user-guide.md#install-helm)). Use an x86_64 machine: on arm64 (for example
   Apple Silicon), saving the images can fail or export images that do not run on the server.
-- Outbound access to `github.com`, `get.k3s.io`, `get.helm.sh`, `kubernetes.github.io`,
-  `registry.k8s.io`, Docker Hub, and `docker.cke-cs.com`.
+- Outbound access to `github.com`, `get.k3s.io`, `get.helm.sh`, `blob.istio.io` (Istio's Helm
+  charts), Docker Hub, and `docker.cke-cs.com`.
 - The registry logins PlexTrac provided: the PlexTrac image registry and CKEditor
   (`docker.cke-cs.com`). These are the same credentials a connected install puts in
   `.env.local`.
@@ -73,8 +88,8 @@ versions ingress-nginx 1.15 supports.
 ### 1.1 Set versions
 
 ```bash
-export K3S_VERSION="v1.35.9+k3s1"
-export INGRESS_NGINX_VERSION="4.15.1"
+export K3S_VERSION="v1.37.2+k3s1"
+export ISTIO_VERSION="1.31.4"
 export HELM_VERSION="v3.22.0"
 export K3S_SELINUX_RELEASE="v1.6.stable.1"
 export K3S_SELINUX_RPM="k3s-selinux-1.6-1.el9.noarch.rpm"
@@ -106,29 +121,16 @@ Both `sha256sum -c` commands must report `OK` for every file.
 
 ```bash
 git clone https://github.com/PlexTrac/helm-charts.git
-grep '^version:' helm-charts/charts/plextrac/Chart.yaml   # must be 2.29.0 or later
+grep '^version:' helm-charts/charts/plextrac/Chart.yaml   # must be 2.30.0 or later
 
-helm pull ingress-nginx --repo https://kubernetes.github.io/ingress-nginx \
-  --version "${INGRESS_NGINX_VERSION}"
+helm pull base --repo https://blob.istio.io/istio-release/charts --version "${ISTIO_VERSION}"
+helm pull istiod --repo https://blob.istio.io/istio-release/charts --version "${ISTIO_VERSION}"
 ```
 
-Create the ingress-nginx values for the air gap:
-
-```bash
-cat > ingress-nginx-values.yaml <<'EOF'
-# Reference the controller images by tag only. By default the chart pins them by registry
-# digest, which an image loaded from an archive may not match, so the kubelet would try to
-# pull it from registry.k8s.io.
-controller:
-  image:
-    digest: ""
-    digestChroot: ""
-  admissionWebhooks:
-    patch:
-      image:
-        digest: ""
-EOF
-```
+This downloads Istio's `base` (its CRDs) and `istiod` charts as `base-1.31.4.tgz` and
+`istiod-1.31.4.tgz`. Their values are in the PlexTrac repository:
+`helm-charts/charts/plextrac/examples/istiod-values.yaml` runs istiod as a Gateway API controller
+only, sized for a single node.
 
 ### 1.4 Create your values file
 
@@ -143,11 +145,14 @@ global:
   image:
     pullPolicy: IfNotPresent      # REQUIRED in an air gap: use the imported images, never pull
   ingress:
+    enabled: false                # no ingress-nginx Ingresses: the gateway below routes instead
     host: plextrac.mycompany.com  # your internal DNS name for PlexTrac
     tlsSecretName: plextrac-tls   # the TLS secret you create on the server (step 2.8)
     certManager:
       issuer: ""                  # no cert-manager or Let's Encrypt in an air gap
     certManagerClusterIssuer: ""
+  gateway:
+    enabled: true                 # Gateway API routing, served by Istio (step 2.6)
 
 secrets:
   mode: manual
@@ -165,6 +170,9 @@ secrets:
 EOF
 ```
 
+`host` and `tlsSecretName` stay under `global.ingress` even though no Ingress is created: the
+gateway uses them too.
+
 Everything else comes from the chart defaults, as in a connected install. To run the optional
 components (Synqly, Keycloak, MCP), add their settings from the
 [user guide](user-guide.md#phase-3--configure-your-values-file) now, so their images are in the
@@ -178,15 +186,24 @@ helm template plextrac ./helm-charts/charts/plextrac --namespace plextrac -f my-
   | grep -E '^[[:space:]]*(- )?image:' | awk '{print $NF}' | tr -d '"' | sort -u \
   > images-plextrac.txt
 
-helm template ingress-nginx "./ingress-nginx-${INGRESS_NGINX_VERSION}.tgz" --namespace ingress-nginx \
-  -f ingress-nginx-values.yaml \
-  | grep -E '^[[:space:]]*(- )?image:' | awk '{print $NF}' | tr -d '"' | sort -u \
-  > images-ingress-nginx.txt
+helm template istiod "./istiod-${ISTIO_VERSION}.tgz" --namespace istio-system \
+  -f helm-charts/charts/plextrac/examples/istiod-values.yaml > istiod-rendered.yaml
+ISTIO_HUB=$(grep -m1 -oE '"hub": "[^"]+"' istiod-rendered.yaml | cut -d'"' -f4)
+ISTIO_TAG=$(grep -m1 -oE '"tag": "[^"]+"' istiod-rendered.yaml | cut -d'"' -f4)
+printf '%s\n' "${ISTIO_HUB}/pilot:${ISTIO_TAG}" "${ISTIO_HUB}/proxyv2:${ISTIO_TAG}" \
+  > images-istio.txt
+grep -cF "image: \"${ISTIO_HUB}/pilot:${ISTIO_TAG}\"" istiod-rendered.yaml   # must print 1
 
-cat images-plextrac.txt images-ingress-nginx.txt
+cat images-plextrac.txt images-istio.txt
 ```
 
-With the values above and the chart 2.29.0 defaults, the list is:
+Istio needs two images: `pilot` runs istiod, and `proxyv2` runs the gateway proxy that istiod
+creates for PlexTrac. Only `pilot` appears in the rendered manifests as an `image:` line. istiod
+builds the proxy's image name when it creates the proxy, from the registry (`hub`) and `tag` in
+its values, so the commands read those two from the render. The `grep -c` confirms that istiod's
+own Deployment uses the same registry and tag. The `base` chart has no images.
+
+With the values above and the chart 2.30.0 defaults, the list is:
 
 ```
 docker.cke-cs.com/cs:latest
@@ -197,8 +214,8 @@ plextrac/plextracdb:7.2.0
 plextrac/plextracnginx:stable
 plextrac/plextracpostgres:stable
 redis:8.4.0-alpine
-registry.k8s.io/ingress-nginx/controller:v1.15.1
-registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.6.9
+docker.io/istio/pilot:1.31.4
+docker.io/istio/proxyv2:1.31.4
 ```
 
 Confirm that no container will try to pull:
@@ -224,7 +241,7 @@ only one image per archive.
 docker login -u <plextrac-registry-username>                     # Docker Hub, unless PlexTrac gave you another registry
 docker login docker.cke-cs.com -u <ckeditor-registry-username>
 
-cat images-plextrac.txt images-ingress-nginx.txt | while read -r image; do
+cat images-plextrac.txt images-istio.txt | while read -r image; do
   docker pull --platform linux/amd64 "$image" </dev/null || echo "FAILED: $image"
 done
 ```
@@ -234,7 +251,7 @@ Then save the images into two archives:
 
 ```bash
 docker save -o plextrac-images.tar $(cat images-plextrac.txt) && gzip -f plextrac-images.tar
-docker save -o ingress-nginx-images.tar $(cat images-ingress-nginx.txt) && gzip -f ingress-nginx-images.tar
+docker save -o istio-images.tar $(cat images-istio.txt) && gzip -f istio-images.tar
 ```
 
 **Podman**
@@ -263,7 +280,7 @@ qualify() {
 podman login docker.io -u <plextrac-registry-username>   # or the registry PlexTrac gave you
 podman login docker.cke-cs.com -u <ckeditor-registry-username>
 
-qualify images-plextrac.txt images-ingress-nginx.txt | while read -r image; do
+qualify images-plextrac.txt images-istio.txt | while read -r image; do
   podman pull --platform linux/amd64 "$image" </dev/null || echo "FAILED: $image"
 done
 ```
@@ -273,7 +290,7 @@ Then save the images into two archives:
 
 ```bash
 podman save -m -o plextrac-images.tar $(qualify images-plextrac.txt) && gzip -f plextrac-images.tar
-podman save -m -o ingress-nginx-images.tar $(qualify images-ingress-nginx.txt) && gzip -f ingress-nginx-images.tar
+podman save -m -o istio-images.tar $(qualify images-istio.txt) && gzip -f istio-images.tar
 ```
 
 **Check the archives**
@@ -282,7 +299,7 @@ With either tool, list the image names in each archive. This reads each archive 
 give it a minute:
 
 ```bash
-for archive in plextrac-images.tar.gz ingress-nginx-images.tar.gz; do
+for archive in plextrac-images.tar.gz istio-images.tar.gz; do
   echo "== $archive"
   tar -xzOf "$archive" manifest.json | grep -o '"RepoTags":\[[^]]*]'
 done
@@ -301,8 +318,8 @@ tar -czf helm-charts.tar.gz helm-charts
 sha256sum \
   k3s k3s-airgap-images-amd64.tar.zst k3s-install.sh "${K3S_SELINUX_RPM}" \
   "helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-  "ingress-nginx-${INGRESS_NGINX_VERSION}.tgz" ingress-nginx-values.yaml ingress-nginx-images.tar.gz \
-  helm-charts.tar.gz my-values.yaml images-plextrac.txt images-ingress-nginx.txt \
+  "base-${ISTIO_VERSION}.tgz" "istiod-${ISTIO_VERSION}.tgz" istio-images.tar.gz \
+  helm-charts.tar.gz my-values.yaml images-plextrac.txt images-istio.txt \
   plextrac-images.tar.gz \
   > SHA256SUMS
 ```
@@ -396,7 +413,7 @@ sudo ip route add default via 203.0.113.255 dev dummy0 metric 1000
 
 ```bash
 sudo mkdir -p /var/lib/rancher/k3s/agent/images
-sudo cp k3s-airgap-images-amd64.tar.zst ingress-nginx-images.tar.gz plextrac-images.tar.gz \
+sudo cp k3s-airgap-images-amd64.tar.zst istio-images.tar.gz plextrac-images.tar.gz \
   /var/lib/rancher/k3s/agent/images/
 sudo restorecon -R /var/lib/rancher   # skip if SELinux is disabled
 ```
@@ -419,7 +436,7 @@ sudo tee /etc/rancher/k3s/config.yaml >/dev/null <<EOF
 node-name: ${NODE_NAME}
 write-kubeconfig-mode: "0644"   # lets the plextrac user read the kubeconfig without sudo
 disable:
-  - traefik                     # PlexTrac uses ingress-nginx
+  - traefik                     # PlexTrac's gateway (Istio) needs ports 80 and 443
 selinux: false                  # keep off, see SELinux in step 2.2
 EOF
 
@@ -435,7 +452,7 @@ Confirm the node is Ready and every bundled image is on it:
 ```bash
 sudo k3s kubectl get nodes
 
-cat images-plextrac.txt images-ingress-nginx.txt | while read -r image; do
+cat images-plextrac.txt images-istio.txt | while read -r image; do
   if sudo k3s crictl inspecti "$image" >/dev/null 2>&1 </dev/null; then
     echo "ok       $image"
   else
@@ -454,7 +471,7 @@ sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
 helm version
 ```
 
-### 2.6 Switch to the plextrac user and install ingress-nginx
+### 2.6 Switch to the plextrac user and install Istio
 
 ```bash
 sudo su - plextrac
@@ -462,22 +479,42 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
 cd /opt/plextrac-airgap
 tar -xzf helm-charts.tar.gz
-
-helm upgrade --install ingress-nginx ./ingress-nginx-*.tgz \
-  --namespace ingress-nginx --create-namespace \
-  -f ingress-nginx-values.yaml \
-  --wait
-
-kubectl -n ingress-nginx get pods
-kubectl -n ingress-nginx get svc ingress-nginx-controller
 ```
 
-The service's `EXTERNAL-IP` is the server's own IP (K3s ServiceLB).
+K3s installs the Gateway API CRDs from its own files shortly after it starts. Wait for them and
+check their version:
+
+```bash
+kubectl wait --for=create --timeout=5m \
+  crd/gateways.gateway.networking.k8s.io crd/httproutes.gateway.networking.k8s.io
+kubectl get crd gateways.gateway.networking.k8s.io \
+  -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}{"\n"}'
+```
+
+The last command prints `v1.6.3`. Then install Istio from the bundled charts, as a Gateway API
+controller only (no service mesh):
+
+```bash
+helm upgrade --install istio-base ./base-*.tgz \
+  --namespace istio-system --create-namespace \
+  --set defaultRevision=default \
+  --wait
+helm upgrade --install istiod ./istiod-*.tgz \
+  --namespace istio-system \
+  -f helm-charts/charts/plextrac/examples/istiod-values.yaml \
+  --wait
+
+kubectl -n istio-system get pods
+```
+
+istiod must be `Running`. It creates the gateway proxy later, when the PlexTrac chart creates
+its Gateway (step 2.10).
 
 ### 2.7 Create the DNS record
 
-In your internal DNS, point `plextrac.mycompany.com` at the server's IP (the `EXTERNAL-IP`
-above). For a quick test without DNS, add an `/etc/hosts` entry on the client machine instead.
+In your internal DNS, point `plextrac.mycompany.com` at the server's IP. The PlexTrac gateway
+takes ports 80 and 443 on that IP through K3s's built-in load balancer (ServiceLB). For a quick
+test without DNS, add an `/etc/hosts` entry on the client machine instead.
 
 ### 2.8 Create the namespace and TLS secret
 
@@ -502,7 +539,8 @@ kubectl create namespace plextrac
 kubectl -n plextrac create secret tls plextrac-tls --cert=fullchain.pem --key=privkey.pem
 ```
 
-The secret name must match `global.ingress.tlsSecretName` in `my-values.yaml`.
+The secret name must match `global.ingress.tlsSecretName` in `my-values.yaml`. The gateway has
+no fallback certificate: without this secret, HTTPS connections fail.
 
 ### 2.9 Finish the values file
 
@@ -535,6 +573,9 @@ helm upgrade --install plextrac ./helm-charts/charts/plextrac \
 it with `kubectl -n plextrac get pods -w` in a second terminal. The startup order and what to
 expect are described in [user guide Phase 4](user-guide.md#phase-4--install).
 
+The chart creates the Gateway `plextrac` and its routes. istiod then deploys the gateway proxy,
+a Deployment and Service named `plextrac-istio`, in the `plextrac` namespace.
+
 ### 2.11 Verify
 
 ```bash
@@ -542,15 +583,20 @@ kubectl -n plextrac get pods
 kubectl -n plextrac get jobs
 kubectl get pods -A | grep -E 'ErrImagePull|ImagePullBackOff' || echo "no image pull errors"
 
-INGRESS_IP=$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
+kubectl -n plextrac get gateway plextrac   # PROGRAMMED True
+kubectl -n plextrac get httproute
+
+GATEWAY_IP=$(kubectl -n plextrac get svc plextrac-istio \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-curl -sk --resolve "plextrac.mycompany.com:443:${INGRESS_IP}" \
+curl -sk --resolve "plextrac.mycompany.com:443:${GATEWAY_IP}" \
   https://plextrac.mycompany.com/api/v2/health/full
 ```
 
-Every pod should be `Running` and Ready, or `Completed` for Jobs, and the health check should
-return JSON. `-k` skips certificate verification for this test; use `--cacert <your-ca.pem>`
-instead to check the certificate as well.
+Every pod should be `Running` and Ready, or `Completed` for Jobs, and the gateway must show
+`PROGRAMMED` `True`. Its address is the K3s node IP: the server's IP, or `203.0.113.254` if you
+added the dummy default route in step 2.2. PlexTrac answers on the server's IP either way. The
+health check should return JSON. `-k` skips certificate verification for this test; use
+`--cacert <your-ca.pem>` instead to check the certificate as well.
 
 ### 2.12 Sign in
 
@@ -584,8 +630,8 @@ On the staging host, in `~/plextrac-airgap` with the variables from step 1.1 set
 git -C helm-charts pull   # or check out the release you are moving to
 ```
 
-Then re-run steps 1.5 and 1.6. You can skip saving `ingress-nginx-images.tar.gz`: the K3s and
-ingress-nginx files do not change. Package and checksum only what you will transfer:
+Then re-run steps 1.5 and 1.6. You can skip saving `istio-images.tar.gz`: the K3s and Istio
+files do not change. Package and checksum only what you will transfer:
 
 ```bash
 tar -czf helm-charts.tar.gz helm-charts
@@ -637,9 +683,9 @@ restart includes Postgres and MinIO, so API and CKEditor pods may restart once w
 comes back.
 
 > Do not run `crictl rmi --prune` on an air-gapped node. It deletes every image that no running
-> container uses, including images that only Jobs use (`bootstrap-minio`, the ingress-nginx
-> certificate job). The node cannot pull them back; they return only when K3s restarts and
-> re-imports its archives.
+> container uses, including images that only Jobs use (`bootstrap-minio`, and the K3s Job that
+> installs the Gateway API CRDs). The node cannot pull them back; they return only when K3s
+> restarts and re-imports its archives.
 
 ---
 
@@ -668,7 +714,8 @@ For anything not specific to the air gap, see the [user guide](user-guide.md#tro
 ### `ErrImagePull` or `ImagePullBackOff`
 
 In an air gap this means the kubelet tried to reach a registry. Check the pod's events, the pull
-policy and image it uses, and whether that image is on the node:
+policy and image it uses, and whether that image is on the node. For istiod, use the
+`istio-system` namespace; the gateway proxy (`plextrac-istio-...`) runs in `plextrac`.
 
 ```bash
 kubectl -n plextrac describe pod <pod> | grep -A10 Events
@@ -681,8 +728,40 @@ sudo k3s crictl inspecti <image>   # from your admin account
 - **`crictl inspecti` fails:** the image is not on the node because it was not in the bundle (for
   example, you enabled a component after building it). Rebuild the lists and archive on the
   staging host and import it as in [Upgrading](#upgrading).
-- **An ingress-nginx image ends in `@sha256:...`:** the digest overrides in
-  `ingress-nginx-values.yaml` were not applied. Re-run step 2.6 with `-f ingress-nginx-values.yaml`.
+
+### `no matches for kind "Gateway"` when installing PlexTrac
+
+The Gateway API CRDs are missing. K3s releases before 1.37 do not install them (see
+[Versions](#versions)). On 1.37, check the K3s Job that installs them:
+
+```bash
+kubectl -n kube-system get helmchart gateway-api-crd
+kubectl -n kube-system get job helm-install-gateway-api-crd
+kubectl -n kube-system logs job/helm-install-gateway-api-crd
+```
+
+The Job runs the `rancher/klipper-helm` image from `k3s-airgap-images-amd64.tar.zst`. If its pod
+shows `ErrImagePull`, that archive was not in `/var/lib/rancher/k3s/agent/images/` when K3s
+started (step 2.3).
+
+### The gateway is not programmed, or HTTPS fails
+
+```bash
+kubectl -n plextrac describe gateway plextrac
+kubectl -n plextrac get pods,svc -l gateway.networking.k8s.io/gateway-name=plextrac
+kubectl -n istio-system logs deploy/istiod --tail=50
+```
+
+- **No `plextrac-istio` pod:** istiod is not running (step 2.6).
+- **The `plextrac-istio` pod shows `ErrImagePull`:** `istio/proxyv2` is not on the node. See
+  [`ErrImagePull`](#errimagepull-or-imagepullbackoff).
+- **The `plextrac-istio` Service stays `<pending>`:** another LoadBalancer Service holds ports 80
+  and 443, for example Traefik when it was not disabled in step 2.4. Find it with
+  `kubectl get svc -A | grep LoadBalancer`.
+- **HTTPS handshake fails while HTTP works:** the TLS secret is missing, or its name does not
+  match `global.ingress.tlsSecretName` (step 2.8).
+
+Request logs: `kubectl -n plextrac logs deploy/plextrac-istio`.
 
 ### Images missing or wrong after building with Podman
 
