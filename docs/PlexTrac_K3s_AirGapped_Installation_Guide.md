@@ -687,7 +687,7 @@ comes back.
 
 ## Moving from ingress-nginx to Gateway API
 
-Earlier versions of this guide installed K3s v1.35.9 and ingress-nginx 4.15.1 and routed through
+Earlier versions of this guide installed K3s v1.35 (v1.35.9 or v1.35.10) and ingress-nginx 4.15.1 and routed through
 the chart's Ingresses. ingress-nginx gets no more security fixes, so move such an install to
 Gateway API. This section does that from local files, in the three phases of the
 [migration runbook](runbooks/ingress-nginx_to_gateway-api.md), which explains each phase and what
@@ -980,7 +980,8 @@ Follow it with `sudo journalctl -u k3s -f`.
 
 ### K3s fails to start and mentions the node IP or a default route
 
-The server has no default route. See **Default route** in step 2.2.
+The server has no default route. See **Default route** in step 2.2. K3s waits up to 60 seconds
+for one before it exits with `no default routes found`, so the error can take a minute to appear.
 
 ### Only one plextracapi pod can read uploads
 
